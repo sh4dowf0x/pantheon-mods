@@ -6,7 +6,19 @@ public class AddonEvent
     
     public void Subscribe(Action handler) => Event += handler;
     public void Unsubscribe(Action handler) => Event -= handler;
-    internal void Raise() => Event();
+    internal void Raise()
+    {
+        foreach (Action handler in Event.GetInvocationList())
+        {
+            try
+            {
+                handler();
+            }
+            catch
+            {
+            }
+        }
+    }
 }
 
 public class AddonEvent<T>
@@ -15,5 +27,17 @@ public class AddonEvent<T>
 
     public void Subscribe(Action<T> handler) => Event += handler;
     public void Unsubscribe(Action<T> handler) => Event -= handler;
-    internal void Raise(T arg) => Event(arg);
+    internal void Raise(T arg)
+    {
+        foreach (Action<T> handler in Event.GetInvocationList())
+        {
+            try
+            {
+                handler(arg);
+            }
+            catch
+            {
+            }
+        }
+    }
 }

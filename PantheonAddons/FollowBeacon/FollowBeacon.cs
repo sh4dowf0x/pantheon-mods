@@ -108,7 +108,7 @@ public sealed class FollowBeacon : Addon
     {
         return new IConfigurationValue[]
         {
-            new PicklistConfigurationValue("Mode", "Choose whether this client writes or reads the shared beacon file.", 0, new[] { DisabledMode, LeaderMode, FollowerMode }, SetMode),
+            new PicklistConfigurationValue("Mode", "Choose whether this client writes or reads the shared beacon file.", 0, new[] { DisabledMode, LeaderMode, FollowerMode }, value => SetMode(value, false)),
             new FloatConfigurationValue("Update interval", "Seconds between beacon file updates.", 0.25f, 0.1f, 2.0f, 0.05f, value => _updateIntervalSeconds = value),
             new FloatConfigurationValue("Follow distance", "Desired follower distance from the leader.", 3.0f, 0.5f, 15.0f, 0.5f, value => _followDistance = value),
             new FloatConfigurationValue("Assist turn deadzone", "Degrees off target before assist turns in place toward the leader.", 70.0f, 3.0f, 120.0f, 1.0f, value => _assistTurnDeadZoneDegrees = value),
@@ -257,7 +257,7 @@ public sealed class FollowBeacon : Addon
         UpdateAssist();
     }
 
-    private void SetMode(int index)
+    private void SetMode(int index, bool notifyChat = true)
     {
         _mode = index switch
         {
@@ -287,7 +287,10 @@ public sealed class FollowBeacon : Addon
             _lastLeaderAgeSeconds = double.PositiveInfinity;
         }
 
-        Chat.AddInfoMessage($"{_statusLine} Shared file: {_beaconPath}");
+        if (notifyChat)
+        {
+            SafeAddInfoMessage($"{_statusLine} Shared file: {_beaconPath}");
+        }
 
         if (_mode == DisabledMode)
         {
@@ -1220,12 +1223,28 @@ public sealed class FollowBeacon : Addon
     {
         if (_controlsWindow != null)
         {
-            _controlsWindow.Enable(true);
-            _leaderButton?.Enable(true);
-            _followerButton?.Enable(true);
-            _assistButton?.Enable(true);
-            RefreshControlButtons();
-            return true;
+            try
+            {
+                _controlsWindow.Enable(true);
+                _leaderButton?.Enable(true);
+                _followerButton?.Enable(true);
+                _assistButton?.Enable(true);
+                RefreshControlButtons();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _controlsWindow = null;
+                _leaderButton = null;
+                _followerButton = null;
+                _assistButton = null;
+                _nextControlsWindowAttemptAt = DateTime.UtcNow.AddSeconds(1);
+                if (!_reportedControlsWindowFailure)
+                {
+                    _reportedControlsWindowFailure = true;
+                    Logger.Error($"Follow Beacon controls became unavailable: {ex}");
+                }
+            }
         }
 
         if (!notifyChat && DateTime.UtcNow < _nextControlsWindowAttemptAt)
@@ -1320,9 +1339,23 @@ public sealed class FollowBeacon : Addon
     {
         if (_window != null)
         {
-            _window.Enable(true);
-            _text?.Enable(true);
-            return true;
+            try
+            {
+                _window.Enable(true);
+                _text?.Enable(true);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _window = null;
+                _text = null;
+                _nextWindowAttemptAt = DateTime.UtcNow.AddSeconds(1);
+                if (!_reportedWindowFailure)
+                {
+                    _reportedWindowFailure = true;
+                    Logger.Error($"Follow Beacon window became unavailable: {ex}");
+                }
+            }
         }
 
         if (!notifyChat && DateTime.UtcNow < _nextWindowAttemptAt)

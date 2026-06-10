@@ -77,23 +77,37 @@ public class AddonLoader : MelonMod
         
         foreach (var addonFile in Directory.GetFiles(AddonsFolderPath, "*.dll"))
         {
-            // Read using a stream instead of LoadFromFile to prevent locking, and load to a separate assembly context
-            // so that we can unload it later, as MelonLoader doesn't like loading an assembly with the same name as
-            // an already loaded assembly
-            using var reader = File.OpenRead(addonFile);
-            var assembly = _assemblyLoadContext.LoadFromStream(reader);
-            foreach (var type in assembly.GetTypes())
+            try
             {
-                if (!type.IsSubclassOf(typeof(Addon)))
+                // Read using a stream instead of LoadFromFile to prevent locking, and load to a separate assembly context
+                // so that we can unload it later, as MelonLoader doesn't like loading an assembly with the same name as
+                // an already loaded assembly
+                using var reader = File.OpenRead(addonFile);
+                var assembly = _assemblyLoadContext.LoadFromStream(reader);
+                foreach (var type in assembly.GetTypes())
                 {
-                    continue;
-                }
+                    if (!type.IsSubclassOf(typeof(Addon)))
+                    {
+                        continue;
+                    }
                 
-                var addon = ScriptActivator.ActivateAddon(type);
-                if (addon != null)
-                {
-                    LoadedAddons.Add(addon);
+                    try
+                    {
+                        var addon = ScriptActivator.ActivateAddon(type);
+                        if (addon != null)
+                        {
+                            LoadedAddons.Add(addon);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MelonLogger.Error($"Failed to activate addon type {type.FullName} from {Path.GetFileName(addonFile)}: {ex}");
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"Failed to load addon assembly {addonFile}: {ex}");
             }
         }
     }
