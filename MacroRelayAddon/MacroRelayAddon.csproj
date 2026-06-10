@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <AssemblyName>MacroRelay</AssemblyName>
+        <RootNamespace>PantheonAddons.MacroRelay</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Compile Include="..\PantheonAddons\MacroRelay\MacroRelay.cs" Link="MacroRelay.cs" />
+        <ProjectReference Include="..\PantheonAddonFramework\PantheonAddonFramework.csproj" />
+    </ItemGroup>
+
+    <PropertyGroup>
+        <AppDataPath Condition="'$(OS)' == 'Windows_NT'">$(USERPROFILE)/AppData/Roaming/PantheonAddons</AppDataPath>
+        <AppDataPath Condition="'$(OS)' != 'Windows_NT'">$(HOME)/.config/PantheonAddons</AppDataPath>
+    </PropertyGroup>
+
+    <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(SkipDeploy)' != 'true'">
+        <ItemGroup>
+            <FilesToCopy Include="$(TargetDir)MacroRelay.dll" />
+        </ItemGroup>
+        <Copy SourceFiles="@(FilesToCopy)" DestinationFolder="$(AppDataPath)" />
+    </Target>
+
+</Project>

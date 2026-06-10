@@ -1,0 +1,63 @@
+namespace PantheonAddonFramework.Models;
+
+public interface IEntityStats
+{
+    float CurrentHealth { get; }
+    float MaxHealth { get; }
+    float CurrentMana { get; }
+    float MaxMana { get; }
+    float CurrentOpportunity { get; }
+    float MaxOpportunity { get; }
+    float CurrentMomentum { get; }
+    float MaxMomentum { get; }
+    float CurrentVision { get; }
+    float MaxVision { get; }
+    float CurrentEndurance { get; }
+    float MaxEndurance { get; }
+    float CurrentResilience { get; }
+    float MaxResilience { get; }
+    float CurrentCelestialPower { get; }
+    float MaxCelestialPower { get; }
+    float CurrentEssence { get; }
+    float MaxEssence { get; }
+    float CurrentWrath { get; }
+    float MaxWrath { get; }
+    float CurrentReckoning { get; }
+    float MaxReckoning { get; }
+    float CurrentFireFocus { get; }
+    float MaxFireFocus { get; }
+    float CurrentBattlePoints { get; }
+    float MaxBattlePoints { get; }
+    float CurrentColdFocus { get; }
+    float MaxColdFocus { get; }
+    float CurrentArcaneFocus { get; }
+    float MaxArcaneFocus { get; }
+    float CurrentShockFocus { get; }
+    float MaxShockFocus { get; }
+    float CurrentChi { get; }
+    float MaxChi { get; }
+    float CurrentGateOfAnger { get; }
+    float MaxGateOfAnger { get; }
+    float CurrentGateOfPeace { get; }
+    float MaxGateOfPeace { get; }
+    float CurrentGateOfBalance { get; }
+    float MaxGateOfBalance { get; }
+    float CurrentGateOfSoul { get; }
+    float MaxGateOfSoul { get; }
+    float CurrentGateOfRelease { get; }
+    float MaxGateOfRelease { get; }
+    float CurrentNpcResource { get; }
+    float MaxNpcResource { get; }
+    float CurrentCelestialBond { get; }
+    float MaxCelestialBond { get; }
+    float CurrentReadiness { get; }
+    float MaxReadiness { get; }
+    float CurrentAbsorbShield { get; }
+    float MaxAbsorbShield { get; }
+    float CurrentBreath { get; }
+    float MaxBreath { get; }
+    float CurrentEnergy { get; }
+    float MaxEnergy { get; }
+    float CurrentThirst { get; }
+    float MaxThirst { get; }
+}
