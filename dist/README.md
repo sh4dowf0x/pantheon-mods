@@ -3,6 +3,7 @@
 This folder contains ready-to-install zip packages:
 
 - `PantheonAutoFollowMod.zip`
+- `PantheonCombatDataMod.zip`
 - `PantheonMacroRelayMod.zip`
 
 Each zip contains:
