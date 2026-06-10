@@ -59,3 +59,13 @@ The leader writes:
 `%APPDATA%\PantheonAddons\FollowBeacon\leader-location.json`
 
 The file is written atomically through a temporary file so the follower should not read partial JSON.
+
+To override the shared folder, edit `GameFolder\Mods\PantheonAddons\FollowBeaconConfig.json` before starting the game:
+
+```json
+{
+  "BeaconFolder": "C:\\pantheonmods"
+}
+```
+
+The config is read when the addon starts. Restart the client after changing it. `/followbeacon path` shows the active shared file and config file locations.

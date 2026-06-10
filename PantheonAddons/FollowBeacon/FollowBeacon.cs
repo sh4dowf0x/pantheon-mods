@@ -1438,7 +1438,13 @@ public sealed class FollowBeacon : Addon
         {
             var config = JsonSerializer.Deserialize<PathConfig>(File.ReadAllText(configPath), PathConfigJsonOptions);
             var configuredBeaconPath = ExpandConfiguredPath(config?.BeaconPath);
-            var configuredBeaconFolder = ExpandConfiguredPath(config?.BeaconFolder);
+            var configuredBeaconFolder = ExpandConfiguredPath(
+                FirstNonBlank(
+                    config?.BeaconFolder,
+                    config?.DataFolder,
+                    config?.SharedFolder,
+                    config?.Directory,
+                    config?.Folder));
 
             if (!string.IsNullOrWhiteSpace(configuredBeaconPath))
             {
@@ -1452,11 +1458,22 @@ public sealed class FollowBeacon : Addon
             }
 
             _inputLogPath = Path.Combine(_beaconFolder, "input-events.jsonl");
+
+            if (string.IsNullOrWhiteSpace(configuredBeaconPath) && string.IsNullOrWhiteSpace(configuredBeaconFolder))
+            {
+                SafeAddInfoMessage($"Follow Beacon config did not set BeaconFolder or BeaconPath, using default: {_beaconPath}");
+            }
         }
         catch (Exception ex)
         {
             Logger.Error($"Follow Beacon path config failed: {ex}");
+            SafeAddInfoMessage($"Follow Beacon could not read config at {configPath}; using default path: {_beaconPath}");
         }
+    }
+
+    private static string? FirstNonBlank(params string?[] values)
+    {
+        return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
     }
 
     private string ExpandConfiguredPath(string? path)
@@ -1496,7 +1513,7 @@ public sealed class FollowBeacon : Addon
         return $"{beacon.CharacterId}:{beacon.ProcessId}:{beacon.CharacterName}";
     }
 
-    private sealed record PathConfig(string? BeaconFolder, string? BeaconPath);
+    private sealed record PathConfig(string? BeaconFolder, string? BeaconPath, string? DataFolder = null, string? SharedFolder = null, string? Directory = null, string? Folder = null);
 
     private sealed record BeaconPayload(
         int SchemaVersion,
