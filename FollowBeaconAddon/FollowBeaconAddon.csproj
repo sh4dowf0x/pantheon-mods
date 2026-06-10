@@ -13,16 +13,12 @@
         <ProjectReference Include="..\PantheonAddonFramework\PantheonAddonFramework.csproj" />
     </ItemGroup>
 
-    <PropertyGroup>
-        <AppDataPath Condition="'$(OS)' == 'Windows_NT'">$(USERPROFILE)/AppData/Roaming/PantheonAddons</AppDataPath>
-        <AppDataPath Condition="'$(OS)' != 'Windows_NT'">$(HOME)/.config/PantheonAddons</AppDataPath>
-    </PropertyGroup>
-
     <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(SkipDeploy)' != 'true'">
         <ItemGroup>
             <FilesToCopy Include="$(TargetDir)FollowBeacon.dll" />
         </ItemGroup>
-        <Copy SourceFiles="@(FilesToCopy)" DestinationFolder="$(AppDataPath)" />
+        <MakeDir Directories="$(GamePath)/Mods/PantheonAddons" />
+        <Copy SourceFiles="@(FilesToCopy)" DestinationFolder="$(GamePath)/Mods/PantheonAddons" />
     </Target>
 
 </Project>

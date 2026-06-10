@@ -12,7 +12,7 @@ Ready-to-install zip packages are kept in `dist/`:
 - `PantheonAutoFollowMod.zip`
 - `PantheonMacroRelayMod.zip`
 
-The mods are intentionally split into separate addon DLLs so either one can be installed or removed independently. If upgrading from an older combined build, remove `%APPDATA%\PantheonAddons\PantheonAddons.dll` before installing these DLLs.
+The mods are intentionally split into separate addon DLLs so either one can be installed or removed independently. Install addon DLLs into the game-local `Mods\PantheonAddons` folder. AppData is kept for legacy addon loading and runtime/shared data files. If upgrading from an older combined build, remove `%APPDATA%\PantheonAddons\PantheonAddons.dll` before installing these DLLs.
 
 # Pantheon Addons
 This project is an **experimental, third party, unofficial addon API** for Pantheon: Rise of the Fallen. Its primary purpose is to create addons in the game via a readonly API which alter or create user interface objects. It is designed to blend in with the overall design of the native user interface, enhancing the game without breaking immersion.

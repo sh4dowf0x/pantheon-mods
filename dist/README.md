@@ -13,4 +13,4 @@ Each zip contains:
 - that addon's config file
 - install notes
 
-Remove older `%APPDATA%\PantheonAddons\PantheonAddons.dll` builds before installing these split packages.
+Addon DLLs now install into `GameFolder\Mods\PantheonAddons`. Remove older `%APPDATA%\PantheonAddons\PantheonAddons.dll`, `%APPDATA%\PantheonAddons\FollowBeacon.dll`, or `%APPDATA%\PantheonAddons\MacroRelay.dll` files before installing these split packages.

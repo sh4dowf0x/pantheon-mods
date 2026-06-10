@@ -13,7 +13,8 @@ public class AddonLoader : MelonMod
 {
     public const string ModVersion = "1.0.0";
     
-    private static readonly string AddonsFolderPath = $@"{Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)}/PantheonAddons";
+    private static readonly string GameAddonsFolderPath = Path.Combine(AppContext.BaseDirectory, "Mods", "PantheonAddons");
+    private static readonly string LegacyAddonsFolderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PantheonAddons");
     private static AssemblyLoadContext? _assemblyLoadContext;
     
     public static readonly List<Addon> LoadedAddons = new();
@@ -33,10 +34,15 @@ public class AddonLoader : MelonMod
     {
         ClassInjector.RegisterTypeInIl2Cpp<AddonPointerClickHandler>();
 
-        if (!Directory.Exists(AddonsFolderPath))
+        if (!Directory.Exists(GameAddonsFolderPath))
         {
-            MelonLogger.Msg($"Creating addons folder {AddonsFolderPath}");
-            Directory.CreateDirectory(AddonsFolderPath);
+            MelonLogger.Msg($"Creating addons folder {GameAddonsFolderPath}");
+            Directory.CreateDirectory(GameAddonsFolderPath);
+        }
+
+        if (!Directory.Exists(LegacyAddonsFolderPath))
+        {
+            Directory.CreateDirectory(LegacyAddonsFolderPath);
         }
         
         // MelonLoader's OnApplicationQuit doesn't fire unless the game shuts down cleanly
@@ -69,13 +75,16 @@ public class AddonLoader : MelonMod
     {
         LoadedAddons.Clear();
         
-        MelonLogger.Msg($"Loading addons in {AddonsFolderPath}");
+        MelonLogger.Msg($"Loading addons in {GameAddonsFolderPath}");
+        MelonLogger.Msg($"Loading legacy addons in {LegacyAddonsFolderPath}");
         
         _assemblyLoadContext?.Unload();
 
         _assemblyLoadContext = new AssemblyLoadContext("Addons", true);
+
+        var loadedFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         
-        foreach (var addonFile in Directory.GetFiles(AddonsFolderPath, "*.dll"))
+        foreach (var addonFile in GetAddonFiles(loadedFileNames))
         {
             try
             {
@@ -108,6 +117,29 @@ public class AddonLoader : MelonMod
             catch (Exception ex)
             {
                 MelonLogger.Error($"Failed to load addon assembly {addonFile}: {ex}");
+            }
+        }
+    }
+
+    private static IEnumerable<string> GetAddonFiles(HashSet<string> loadedFileNames)
+    {
+        foreach (var folderPath in new[] { GameAddonsFolderPath, LegacyAddonsFolderPath })
+        {
+            if (!Directory.Exists(folderPath))
+            {
+                continue;
+            }
+
+            foreach (var addonFile in Directory.GetFiles(folderPath, "*.dll"))
+            {
+                var fileName = Path.GetFileName(addonFile);
+                if (!loadedFileNames.Add(fileName))
+                {
+                    MelonLogger.Warning($"Skipping duplicate addon DLL {addonFile}; an addon with this file name was already loaded from a higher-priority folder.");
+                    continue;
+                }
+
+                yield return addonFile;
             }
         }
     }
