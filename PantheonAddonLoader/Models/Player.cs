@@ -1,6 +1,8 @@
 using Il2Cpp;
 using Il2CppPantheonPersist;
+using Il2CppViNL;
 using PantheonAddonFramework.Models;
+using UnityEngine;
 
 namespace PantheonAddonLoader.Models;
 
@@ -47,6 +49,54 @@ public class Player : IPlayer
         var transform = _entityPlayerGameObject.transform;
         var position = transform.position;
         return new PlayerPosition(position.x, position.y, position.z, transform.eulerAngles.y);
+    }
+
+    public TargetSnapshot? GetOffensiveTarget()
+    {
+        return CreateTargetSnapshot(_entityPlayerGameObject.Targets?.Offensive);
+    }
+
+    public TargetSnapshot? GetDefensiveTarget()
+    {
+        return CreateTargetSnapshot(_entityPlayerGameObject.Targets?.Defensive);
+    }
+
+    public bool TrySetOffensiveTarget(TargetSnapshot? target)
+    {
+        if (_entityPlayerGameObject == null || !IsLocalPlayer || target == null || target.NetworkId == 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            var targets = _entityPlayerGameObject.GetComponent<Targets>();
+            targets?.Rpc?.SetServerOffensiveTarget(new NetworkId(target.NetworkId));
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public bool TrySetDefensiveTarget(TargetSnapshot? target)
+    {
+        if (_entityPlayerGameObject == null || !IsLocalPlayer || target == null || target.NetworkId == 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            var targets = _entityPlayerGameObject.GetComponent<Targets>();
+            targets?.Rpc?.SetServerDefensiveTarget(new NetworkId(target.NetworkId), false);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     public bool TryApplyMovementInput(PlayerMovementInput input)
@@ -148,4 +198,23 @@ public class Player : IPlayer
     }
 
     public bool IsLocalPlayer => _entityPlayerGameObject.NetworkId.Value == EntityPlayerGameObject.LocalPlayerId.Value;
+
+    private static TargetSnapshot? CreateTargetSnapshot(IEntity? entity)
+    {
+        if (entity == null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var name = entity.Info?.DisplayName ?? "";
+            var characterId = entity.Info?.CharacterId ?? 0;
+            return new TargetSnapshot(name, characterId, entity.NetworkId.Value);
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }

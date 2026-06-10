@@ -33,11 +33,13 @@ public sealed class MacroRelay : Addon
     private IAddonTextInputComponent? _slotMacroInput;
     private IAddonButtonComponent? _slotHotkeyButton;
     private IAddonButtonComponent? _receiverToggleButton;
+    private IPlayer? _localPlayer;
     private readonly List<IAddonButtonComponent> _hotbarButtons = new();
     private HotbarSlot[] _slots = CreateDefaultSlots();
     private int _visibleSlotCount = 6;
     private bool _isEnabled;
     private bool _receiverEnabled;
+    private bool _targetSyncEnabled = true;
     private bool _wantsHotbar = true;
     private bool _reportedHotbarFailure;
     private bool _isCapturingHotkey;
@@ -54,6 +56,7 @@ public sealed class MacroRelay : Addon
     {
         LoadPathConfig();
         CustomChatCommands.Add("/macrorelay", HandleCommand);
+        LocalPlayerEvents.LocalPlayerEntered.Subscribe(OnLocalPlayerEntered);
         LifecycleEvents.OnUpdate.Subscribe(OnUpdate);
     }
 
@@ -85,6 +88,7 @@ public sealed class MacroRelay : Addon
     public override void Dispose()
     {
         CustomChatCommands.Remove("/macrorelay");
+        LocalPlayerEvents.LocalPlayerEntered.Unsubscribe(OnLocalPlayerEntered);
         LifecycleEvents.OnUpdate.Unsubscribe(OnUpdate);
         foreach (var button in _hotbarButtons)
         {
@@ -99,7 +103,7 @@ public sealed class MacroRelay : Addon
     {
         if (args.Length == 0 || args[0].Equals("help", StringComparison.OrdinalIgnoreCase))
         {
-            Chat.AddInfoMessage("Macro Relay: /macrorelay list, run <macro>, send <macro>, hotbar show|hide|reload, receiver on|off, status, path");
+            Chat.AddInfoMessage("Macro Relay: /macrorelay list, run <macro>, send <macro>, hotbar show|hide|reload, receiver on|off, target, targetsync on|off, status, path");
             return;
         }
 
@@ -120,8 +124,15 @@ public sealed class MacroRelay : Addon
             case "hotbar":
                 HandleHotbarCommand(args);
                 break;
+            case "target":
+            case "targets":
+                ReportTargets();
+                break;
+            case "targetsync":
+                HandleTargetSyncCommand(args);
+                break;
             case "status":
-                Chat.AddInfoMessage($"{_lastStatus} Receiver: {(_receiverEnabled ? "on" : "off")}");
+                Chat.AddInfoMessage($"{_lastStatus} Receiver: {(_receiverEnabled ? "on" : "off")}. Target sync: {(_targetSyncEnabled ? "on" : "off")}.");
                 break;
             case "path":
                 Chat.AddInfoMessage($"Macro Relay request file: {_requestPath}");
@@ -158,6 +169,14 @@ public sealed class MacroRelay : Addon
     private bool Due(DateTime lastRun)
     {
         return (DateTime.UtcNow - lastRun).TotalSeconds >= _pollIntervalSeconds;
+    }
+
+    private void OnLocalPlayerEntered(IPlayer player)
+    {
+        if (player.IsLocalPlayer)
+        {
+            _localPlayer = player;
+        }
     }
 
     private void ListMacros()
@@ -223,11 +242,14 @@ public sealed class MacroRelay : Addon
     private void SendMacro(string macroName, bool notify)
     {
         var payload = new MacroRequest(
-            SchemaVersion: 1,
+            SchemaVersion: 2,
             RequestId: Guid.NewGuid().ToString("N"),
             MacroName: macroName,
             SenderProcessId: Process.GetCurrentProcess().Id,
-            TimestampUtc: DateTime.UtcNow);
+            TimestampUtc: DateTime.UtcNow,
+            SyncTargets: _targetSyncEnabled,
+            OffensiveTarget: CreateTargetPayload(_localPlayer?.GetOffensiveTarget()),
+            DefensiveTarget: CreateTargetPayload(_localPlayer?.GetDefensiveTarget()));
 
         try
         {
@@ -279,6 +301,44 @@ public sealed class MacroRelay : Addon
                 Chat.AddInfoMessage("Macro Relay receiver: on, off, status");
                 break;
         }
+    }
+
+    private void HandleTargetSyncCommand(string[] args)
+    {
+        if (args.Length < 2 || args[1].Equals("status", StringComparison.OrdinalIgnoreCase))
+        {
+            Chat.AddInfoMessage($"Macro Relay target sync is {(_targetSyncEnabled ? "on" : "off")}.");
+            return;
+        }
+
+        switch (args[1].ToLowerInvariant())
+        {
+            case "on":
+                _targetSyncEnabled = true;
+                SavePathConfig();
+                Chat.AddInfoMessage("Macro Relay target sync enabled.");
+                break;
+            case "off":
+                _targetSyncEnabled = false;
+                SavePathConfig();
+                Chat.AddInfoMessage("Macro Relay target sync disabled.");
+                break;
+            default:
+                Chat.AddInfoMessage("Macro Relay target sync: on, off, status");
+                break;
+        }
+    }
+
+    private void ReportTargets()
+    {
+        if (_localPlayer == null)
+        {
+            Chat.AddInfoMessage("Macro Relay has not found the local player yet.");
+            return;
+        }
+
+        Chat.AddInfoMessage($"Macro Relay offensive target: {FormatTarget(_localPlayer.GetOffensiveTarget())}");
+        Chat.AddInfoMessage($"Macro Relay defensive target: {FormatTarget(_localPlayer.GetDefensiveTarget())}");
     }
 
     private void HandleHotbarCommand(string[] args)
@@ -855,7 +915,66 @@ public sealed class MacroRelay : Addon
         }
 
         _lastRequestId = request.RequestId;
+        TryApplyTargets(request);
         TryActivateMacro(request.MacroName, true);
+    }
+
+    private void TryApplyTargets(MacroRequest request)
+    {
+        if (!request.SyncTargets || _localPlayer == null)
+        {
+            return;
+        }
+
+        var applied = new List<string>();
+        var failed = new List<string>();
+        if (request.OffensiveTarget != null)
+        {
+            if (_localPlayer.TrySetOffensiveTarget(request.OffensiveTarget.ToSnapshot()))
+            {
+                applied.Add($"offensive {request.OffensiveTarget.Name}");
+            }
+            else
+            {
+                failed.Add($"offensive {request.OffensiveTarget.Name}");
+            }
+        }
+
+        if (request.DefensiveTarget != null)
+        {
+            if (_localPlayer.TrySetDefensiveTarget(request.DefensiveTarget.ToSnapshot()))
+            {
+                applied.Add($"defensive {request.DefensiveTarget.Name}");
+            }
+            else
+            {
+                failed.Add($"defensive {request.DefensiveTarget.Name}");
+            }
+        }
+
+        if (applied.Count > 0)
+        {
+            _lastStatus = $"Applied relayed target: {string.Join(", ", applied)}";
+        }
+
+        if (failed.Count > 0)
+        {
+            Chat.AddInfoMessage($"Macro Relay could not apply target: {string.Join(", ", failed)}");
+        }
+    }
+
+    private static TargetPayload? CreateTargetPayload(TargetSnapshot? target)
+    {
+        return target == null || target.NetworkId == 0
+            ? null
+            : new TargetPayload(target.Name, target.CharacterId, target.NetworkId);
+    }
+
+    private static string FormatTarget(TargetSnapshot? target)
+    {
+        return target == null || target.NetworkId == 0
+            ? "none"
+            : $"{target.Name} characterId={target.CharacterId} networkId={target.NetworkId}";
     }
 
     private static string JoinArgs(string[] args, int startIndex)
@@ -891,6 +1010,7 @@ public sealed class MacroRelay : Addon
             _slots = BuildSlots(config?.Slots);
             _visibleSlotCount = Math.Clamp(config?.VisibleSlots ?? _slots.Length, 1, Math.Max(1, _slots.Length));
             _receiverEnabled = config?.ReceiverEnabled ?? _receiverEnabled;
+            _targetSyncEnabled = config?.TargetSyncEnabled ?? _targetSyncEnabled;
         }
         catch (Exception ex)
         {
@@ -970,7 +1090,8 @@ public sealed class MacroRelay : Addon
             RequestPath: null,
             Slots: _slots.Select(slot => new HotbarSlotConfig(slot.Label, slot.Macro, slot.Shortcut, slot.KeyCode, slot.Ctrl, slot.Alt, slot.Shift)).ToArray(),
             VisibleSlots: _visibleSlotCount,
-            ReceiverEnabled: _receiverEnabled);
+            ReceiverEnabled: _receiverEnabled,
+            TargetSyncEnabled: _targetSyncEnabled);
 
         Directory.CreateDirectory(Path.GetDirectoryName(LocalPathConfigPath) ?? _gameFolder);
         File.WriteAllText(LocalPathConfigPath, JsonSerializer.Serialize(config, JsonOptions));
@@ -1200,11 +1321,27 @@ public sealed class MacroRelay : Addon
 
     private string LocalPathConfigPath => Path.Combine(_gameFolder, "Mods", "PantheonAddons", "MacroRelayConfig.json");
 
-    private sealed record PathConfig(string? RelayFolder, string? RequestPath, HotbarSlotConfig[]? Slots, int? VisibleSlots = null, bool? ReceiverEnabled = null);
+    private sealed record PathConfig(string? RelayFolder, string? RequestPath, HotbarSlotConfig[]? Slots, int? VisibleSlots = null, bool? ReceiverEnabled = null, bool? TargetSyncEnabled = null);
 
     private sealed record HotbarSlotConfig(string? Label, string? Macro, string? Shortcut, int KeyCode = 0, bool? Ctrl = null, bool? Alt = null, bool? Shift = null);
 
     private sealed record HotbarSlot(string Label, string Macro, string Shortcut, int KeyCode, bool Ctrl, bool Alt, bool Shift);
 
-    private sealed record MacroRequest(int SchemaVersion, string RequestId, string MacroName, int SenderProcessId, DateTime TimestampUtc);
+    private sealed record TargetPayload(string Name, long CharacterId, uint NetworkId)
+    {
+        public TargetSnapshot ToSnapshot()
+        {
+            return new TargetSnapshot(Name, CharacterId, NetworkId);
+        }
+    }
+
+    private sealed record MacroRequest(
+        int SchemaVersion,
+        string RequestId,
+        string MacroName,
+        int SenderProcessId,
+        DateTime TimestampUtc,
+        bool SyncTargets = false,
+        TargetPayload? OffensiveTarget = null,
+        TargetPayload? DefensiveTarget = null);
 }

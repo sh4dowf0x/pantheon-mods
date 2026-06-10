@@ -26,6 +26,14 @@ public interface IPlayer
 
     PlayerPosition? GetPosition();
 
+    TargetSnapshot? GetOffensiveTarget();
+
+    TargetSnapshot? GetDefensiveTarget();
+
+    bool TrySetOffensiveTarget(TargetSnapshot? target);
+
+    bool TrySetDefensiveTarget(TargetSnapshot? target);
+
     bool TryApplyMovementInput(PlayerMovementInput input);
 
     bool TryApplyMovementInput(PlayerMovementInput input, double seconds);
