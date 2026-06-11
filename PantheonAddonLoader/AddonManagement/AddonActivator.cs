@@ -97,6 +97,7 @@ internal static class ScriptActivator
         instance.WindowPanelEvents = AddonLoader.WindowPanelEvents;
         instance.LocalPlayerEvents = AddonLoader.LocalPlayerEvents;
         instance.PlayerEvents = AddonLoader.PlayerEvents;
+        instance.EntityEvents = AddonLoader.EntityEvents;
         instance.LifecycleEvents = AddonLoader.LifecycleEvents;
         instance.ChatEvents = AddonLoader.ChatEvents;
         instance.CombatEvents = AddonLoader.CombatEvents;

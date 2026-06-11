@@ -4,6 +4,8 @@ This folder contains ready-to-install zip packages:
 
 - `PantheonAutoFollowMod.zip`
 - `PantheonCombatDataMod.zip`
+- `PantheonEntityScannerMod.zip`
+- `PantheonLootDataMod.zip`
 - `PantheonMacroRelayMod.zip`
 
 Each zip contains:
@@ -14,4 +16,4 @@ Each zip contains:
 - that addon's config file
 - install notes
 
-Addon DLLs now install into `GameFolder\Mods\PantheonAddons`. Remove older `%APPDATA%\PantheonAddons\PantheonAddons.dll`, `%APPDATA%\PantheonAddons\FollowBeacon.dll`, or `%APPDATA%\PantheonAddons\MacroRelay.dll` files before installing these split packages.
+Addon DLLs now install into `GameFolder\Mods\PantheonAddons`. Remove older `%APPDATA%\PantheonAddons\PantheonAddons.dll`, `%APPDATA%\PantheonAddons\FollowBeacon.dll`, `%APPDATA%\PantheonAddons\MacroRelay.dll`, `%APPDATA%\PantheonAddons\EntityScanner.dll`, or `%APPDATA%\PantheonAddons\LootData.dll` files before installing these split packages.

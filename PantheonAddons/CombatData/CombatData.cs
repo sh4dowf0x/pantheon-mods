@@ -21,6 +21,7 @@ public sealed class CombatData : Addon
     private string _jsonLogPath = Path.Combine(DefaultOutputFolder, "combat-live-current.jsonl");
     private StreamWriter? _textWriter;
     private StreamWriter? _jsonWriter;
+    private IPlayer? _localPlayer;
     private bool _isEnabled;
     private bool _includeCombatMessages = true;
     private bool _includeStructuredResults = true;
@@ -36,6 +37,8 @@ public sealed class CombatData : Addon
         CustomChatCommands.Add("/combatdata", HandleCommand);
         ChatEvents.MessageReceived.Subscribe(OnMessageReceived);
         CombatEvents.CombatResultApplied.Subscribe(OnCombatResultApplied);
+        LocalPlayerEvents.LocalPlayerEntered.Subscribe(OnLocalPlayerEntered);
+        LocalPlayerEvents.LocalPlayerLeft.Subscribe(OnLocalPlayerLeft);
         _startedAt = DateTime.Now;
         OpenLogs();
     }
@@ -66,6 +69,8 @@ public sealed class CombatData : Addon
         CustomChatCommands.Remove("/combatdata");
         ChatEvents.MessageReceived.Unsubscribe(OnMessageReceived);
         CombatEvents.CombatResultApplied.Unsubscribe(OnCombatResultApplied);
+        LocalPlayerEvents.LocalPlayerEntered.Unsubscribe(OnLocalPlayerEntered);
+        LocalPlayerEvents.LocalPlayerLeft.Unsubscribe(OnLocalPlayerLeft);
         CloseLogs();
     }
 
@@ -169,6 +174,7 @@ public sealed class CombatData : Addon
     {
         EnsureLogsOpen();
         RotateLogsIfNeeded();
+        AddSourceFields(payload);
 
         var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{category}] {rendered}";
         _bufferedLines.Add(line);
@@ -177,6 +183,32 @@ public sealed class CombatData : Addon
         _textWriter?.WriteLine(line);
         _jsonWriter?.WriteLine(JsonSerializer.Serialize(payload));
         _lastStatus = $"Combat Data writing to {_jsonLogPath}";
+    }
+
+    private void OnLocalPlayerEntered(IPlayer player)
+    {
+        _localPlayer = player;
+        OpenLogs();
+    }
+
+    private void OnLocalPlayerLeft(IPlayer player)
+    {
+        if (_localPlayer?.CharacterId == player.CharacterId)
+        {
+            _localPlayer = null;
+            OpenLogs();
+        }
+    }
+
+    private void AddSourceFields(Dictionary<string, object?> payload)
+    {
+        if (_localPlayer == null)
+        {
+            return;
+        }
+
+        payload["sourceCharacterName"] = _localPlayer.Name;
+        payload["sourceCharacterId"] = _localPlayer.CharacterId;
     }
 
     private static bool IsCombatMessage(ChatMessage message)
@@ -315,8 +347,9 @@ public sealed class CombatData : Addon
     {
         CloseLogs();
         Directory.CreateDirectory(_outputFolder);
-        _textLogPath = Path.Combine(_outputFolder, "combat-live-current.txt");
-        _jsonLogPath = Path.Combine(_outputFolder, "combat-live-current.jsonl");
+        var fileSuffix = GetCurrentFileSuffix();
+        _textLogPath = Path.Combine(_outputFolder, $"combat-live-{fileSuffix}.txt");
+        _jsonLogPath = Path.Combine(_outputFolder, $"combat-live-{fileSuffix}.jsonl");
         _textWriter = new StreamWriter(new FileStream(_textLogPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite)) { AutoFlush = true };
         _jsonWriter = new StreamWriter(new FileStream(_jsonLogPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite)) { AutoFlush = true };
         _lastStatus = $"Combat Data writing to {_jsonLogPath}";
@@ -431,13 +464,13 @@ public sealed class CombatData : Addon
             {
                 _jsonLogPath = configuredOutputPath;
                 _outputFolder = Path.GetDirectoryName(_jsonLogPath) ?? DefaultOutputFolder;
-                _textLogPath = Path.Combine(_outputFolder, "combat-live-current.txt");
+                _textLogPath = Path.Combine(_outputFolder, $"combat-live-{GetCurrentFileSuffix()}.txt");
             }
             else if (!string.IsNullOrWhiteSpace(configuredOutputFolder))
             {
                 _outputFolder = configuredOutputFolder;
-                _textLogPath = Path.Combine(_outputFolder, "combat-live-current.txt");
-                _jsonLogPath = Path.Combine(_outputFolder, "combat-live-current.jsonl");
+                _textLogPath = Path.Combine(_outputFolder, $"combat-live-{GetCurrentFileSuffix()}.txt");
+                _jsonLogPath = Path.Combine(_outputFolder, $"combat-live-{GetCurrentFileSuffix()}.jsonl");
             }
 
             _includeCombatMessages = config?.IncludeCombatMessages ?? _includeCombatMessages;
@@ -477,6 +510,18 @@ public sealed class CombatData : Addon
     private static string? FirstNonBlank(params string?[] values)
     {
         return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+    }
+
+    private string GetCurrentFileSuffix()
+    {
+        return string.IsNullOrWhiteSpace(_localPlayer?.Name) ? "current" : SanitizeFileName(_localPlayer.Name);
+    }
+
+    private static string SanitizeFileName(string value)
+    {
+        var invalidChars = Path.GetInvalidFileNameChars();
+        var sanitized = new string(value.Select(ch => invalidChars.Contains(ch) ? '_' : ch).ToArray()).Trim();
+        return string.IsNullOrWhiteSpace(sanitized) ? "current" : sanitized;
     }
 
     private static string ResolveGameFolder()

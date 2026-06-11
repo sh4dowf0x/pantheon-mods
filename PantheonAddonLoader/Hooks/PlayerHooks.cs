@@ -20,6 +20,7 @@ public class PlayerNetworkStart
         }
 
         var player = new Player(__instance);
+        EntityRegistry.AddOrUpdate(__instance, "Player");
         
         if (player.IsLocalPlayer)
         {
@@ -30,6 +31,15 @@ public class PlayerNetworkStart
         }
 
         AddonLoader.PlayerEvents.PlayerAdded.Raise(player);
+    }
+}
+
+[HarmonyPatch(typeof(EntityPlayerGameObject), nameof(EntityPlayerGameObject.NetworkStop))]
+public class PlayerNetworkStop
+{
+    private static void Postfix(EntityPlayerGameObject __instance)
+    {
+        EntityRegistry.Remove(__instance, "Player");
     }
 }
 

@@ -16,8 +16,10 @@ Combat Data exports Pantheon's rendered combat-log messages and structured comba
 
 By default, Combat Data writes:
 
-- `%PUBLIC%\PantheonCombatData\combat-live-current.txt`
-- `%PUBLIC%\PantheonCombatData\combat-live-current.jsonl`
+- `%PROGRAMDATA%\PantheonCombatData\combat-live-CharacterName.txt`
+- `%PROGRAMDATA%\PantheonCombatData\combat-live-CharacterName.jsonl`
+
+Before the character is loaded, it may briefly use `combat-live-current.*`. Once the local player is detected, it switches to the character-specific file. JSONL rows also include `sourceCharacterName` and `sourceCharacterId`.
 
 The live files rotate to `.previous` when either file reaches the configured size cap.
 

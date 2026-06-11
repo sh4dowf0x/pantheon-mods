@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FollowBeaconAddon", "Follow
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MacroRelayAddon", "MacroRelayAddon\MacroRelayAddon.csproj", "{654A5ECF-50B4-44CD-B56E-FE5366112ADF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EntityScannerAddon", "EntityScannerAddon\EntityScannerAddon.csproj", "{78CC7250-778B-418E-B84C-F8F7060CC1CC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -43,5 +45,9 @@ Global
 		{654A5ECF-50B4-44CD-B56E-FE5366112ADF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{654A5ECF-50B4-44CD-B56E-FE5366112ADF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{654A5ECF-50B4-44CD-B56E-FE5366112ADF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{78CC7250-778B-418E-B84C-F8F7060CC1CC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{78CC7250-778B-418E-B84C-F8F7060CC1CC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{78CC7250-778B-418E-B84C-F8F7060CC1CC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{78CC7250-778B-418E-B84C-F8F7060CC1CC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
