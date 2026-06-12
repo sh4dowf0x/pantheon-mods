@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <AssemblyName>PerformanceKeeper</AssemblyName>
+        <RootNamespace>PantheonAddons.PerformanceKeeper</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Compile Include="..\PantheonAddons\PerformanceKeeper\PerformanceKeeper.cs" Link="PerformanceKeeper.cs" />
+        <Compile Include="..\PantheonAddonLoader\NullableAttribute.cs" Link="NullableAttribute.cs" />
+        <Compile Include="..\PantheonAddonLoader\NullableContextAttribute.cs" Link="NullableContextAttribute.cs" />
+        <ProjectReference Include="..\PantheonAddonFramework\PantheonAddonFramework.csproj" />
+        <Reference Include="UnityEngine.CoreModule">
+            <HintPath>$(GamePath)/MelonLoader/Il2CppAssemblies/UnityEngine.CoreModule.dll</HintPath>
+        </Reference>
+    </ItemGroup>
+
+    <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(SkipDeploy)' != 'true'">
+        <ItemGroup>
+            <FilesToCopy Include="$(TargetDir)PerformanceKeeper.dll" />
+        </ItemGroup>
+        <MakeDir Directories="$(GamePath)/Mods/PantheonAddons" />
+        <Copy SourceFiles="@(FilesToCopy)" DestinationFolder="$(GamePath)/Mods/PantheonAddons" />
+    </Target>
+
+</Project>
