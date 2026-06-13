@@ -2,6 +2,7 @@
 
 This folder contains ready-to-install zip packages:
 
+- `PantheonAllMods.zip`
 - `PantheonAutoFollowMod.zip`
 - `PantheonCombatDataMod.zip`
 - `PantheonEntityScannerMod.zip`
@@ -9,6 +10,8 @@ This folder contains ready-to-install zip packages:
 - `PantheonMacroRelayMod.zip`
 - `PantheonPerformanceKeeperMod.zip`
 - `PantheonTargetHealthBarsMod.zip`
+
+Use `PantheonAllMods.zip` to download every current split mod package at once, or use an individual zip when you only want one mod.
 
 Each zip contains:
 
