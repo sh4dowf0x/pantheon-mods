@@ -8,6 +8,7 @@ This folder contains ready-to-install zip packages:
 - `PantheonLootDataMod.zip`
 - `PantheonMacroRelayMod.zip`
 - `PantheonPerformanceKeeperMod.zip`
+- `PantheonTargetHealthBarsMod.zip`
 
 Each zip contains:
 
@@ -17,4 +18,4 @@ Each zip contains:
 - that addon's config file
 - install notes
 
-Addon DLLs now install into `GameFolder\Mods\PantheonAddons`. Remove older `%APPDATA%\PantheonAddons\PantheonAddons.dll`, `%APPDATA%\PantheonAddons\FollowBeacon.dll`, `%APPDATA%\PantheonAddons\MacroRelay.dll`, `%APPDATA%\PantheonAddons\EntityScanner.dll`, `%APPDATA%\PantheonAddons\LootData.dll`, or `%APPDATA%\PantheonAddons\PerformanceKeeper.dll` files before installing these split packages.
+Addon DLLs now install into `GameFolder\Mods\PantheonAddons`. Remove older `%APPDATA%\PantheonAddons\PantheonAddons.dll`, `%APPDATA%\PantheonAddons\FollowBeacon.dll`, `%APPDATA%\PantheonAddons\MacroRelay.dll`, `%APPDATA%\PantheonAddons\EntityScanner.dll`, `%APPDATA%\PantheonAddons\LootData.dll`, `%APPDATA%\PantheonAddons\PerformanceKeeper.dll`, or `%APPDATA%\PantheonAddons\TargetHealthBars.dll` files before installing these split packages.

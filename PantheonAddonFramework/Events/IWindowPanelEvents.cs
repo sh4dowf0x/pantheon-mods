@@ -11,4 +11,6 @@ public interface IWindowPanelEvents
     AddonEvent<IAddonPoolBar> DefensiveTargetReady { get; }
     AddonEvent<float> OffTargetPoolbarChange { get; }
     AddonEvent<float> DefTargetPoolbarChange { get; }
+    AddonEvent<TargetHealthSnapshot> OffTargetHealthChange { get; }
+    AddonEvent<TargetHealthSnapshot> DefTargetHealthChange { get; }
 }

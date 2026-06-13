@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <AssemblyName>TargetHealthBars</AssemblyName>
+        <RootNamespace>PantheonAddons.TargetHealthBars</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Compile Include="..\PantheonAddons\TargetHealthBars\TargetHealthBars.cs" Link="TargetHealthBars.cs" />
+        <ProjectReference Include="..\PantheonAddonFramework\PantheonAddonFramework.csproj" />
+    </ItemGroup>
+
+    <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(SkipDeploy)' != 'true'">
+        <ItemGroup>
+            <FilesToCopy Include="$(TargetDir)TargetHealthBars.dll" />
+        </ItemGroup>
+        <MakeDir Directories="$(GamePath)/Mods/PantheonAddons" />
+        <Copy SourceFiles="@(FilesToCopy)" DestinationFolder="$(GamePath)/Mods/PantheonAddons" />
+    </Target>
+
+</Project>

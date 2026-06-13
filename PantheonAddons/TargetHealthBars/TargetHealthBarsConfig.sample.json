@@ -1,0 +1,9 @@
+{
+  "Enabled": true,
+  "ShowOffensive": true,
+  "ShowDefensive": true,
+  "ShowMana": true,
+  "Format": "both",
+  "FontSize": 17,
+  "TextYOffset": 0
+}
