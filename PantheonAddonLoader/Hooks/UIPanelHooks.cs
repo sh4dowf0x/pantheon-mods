@@ -47,13 +47,22 @@ public class UIPoolBarHandlePoolChangedHook
 
         if (pppName == "Panel_OffensiveTarget")
         {
-            var percent = current / max * 100;
+            var snapshot = TargetPoolSnapshots.CreateTargetSnapshot("Offensive", Globals.LocalPlayer?.Targets?.Offensive);
+            var percent = snapshot.HasTarget ? snapshot.HealthPercent : CalculatePercent(current, max);
             AddonLoader.WindowPanelEvents.OffTargetPoolbarChange.Raise(percent);
+            AddonLoader.WindowPanelEvents.OffTargetHealthChange.Raise(snapshot.HasTarget ? snapshot : new TargetHealthSnapshot("Offensive", current, max, percent, 0, 0, 0));
         }
         if (pppName == "Panel_DefensiveTarget")
         {
-            var percent = current / max * 100;
+            var snapshot = TargetPoolSnapshots.CreateTargetSnapshot("Defensive", Globals.LocalPlayer?.Targets?.Defensive);
+            var percent = snapshot.HasTarget ? snapshot.HealthPercent : CalculatePercent(current, max);
             AddonLoader.WindowPanelEvents.DefTargetPoolbarChange.Raise(percent);
+            AddonLoader.WindowPanelEvents.DefTargetHealthChange.Raise(snapshot.HasTarget ? snapshot : new TargetHealthSnapshot("Defensive", current, max, percent, 0, 0, 0));
         }
+    }
+
+    private static float CalculatePercent(float current, float max)
+    {
+        return max <= 0 ? 0 : current / max * 100;
     }
 }

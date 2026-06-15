@@ -17,6 +17,16 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FollowBeaconAddon", "Follow
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MacroRelayAddon", "MacroRelayAddon\MacroRelayAddon.csproj", "{654A5ECF-50B4-44CD-B56E-FE5366112ADF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EntityScannerAddon", "EntityScannerAddon\EntityScannerAddon.csproj", "{78CC7250-778B-418E-B84C-F8F7060CC1CC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CombatDataAddon", "CombatDataAddon\CombatDataAddon.csproj", "{B0CFB2D0-0899-49EC-BDB7-03FD8EC73411}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LootDataAddon", "LootDataAddon\LootDataAddon.csproj", "{0089366E-9183-4769-8A36-10DD4E668B37}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PerformanceKeeperAddon", "PerformanceKeeperAddon\PerformanceKeeperAddon.csproj", "{FC3A3720-6C39-4673-8C58-6A127F82B3B2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TargetHealthBarsAddon", "TargetHealthBarsAddon\TargetHealthBarsAddon.csproj", "{23346DEA-346C-4A76-A631-9E9B7E97456B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -43,5 +53,25 @@ Global
 		{654A5ECF-50B4-44CD-B56E-FE5366112ADF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{654A5ECF-50B4-44CD-B56E-FE5366112ADF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{654A5ECF-50B4-44CD-B56E-FE5366112ADF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{78CC7250-778B-418E-B84C-F8F7060CC1CC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{78CC7250-778B-418E-B84C-F8F7060CC1CC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{78CC7250-778B-418E-B84C-F8F7060CC1CC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{78CC7250-778B-418E-B84C-F8F7060CC1CC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B0CFB2D0-0899-49EC-BDB7-03FD8EC73411}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B0CFB2D0-0899-49EC-BDB7-03FD8EC73411}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B0CFB2D0-0899-49EC-BDB7-03FD8EC73411}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B0CFB2D0-0899-49EC-BDB7-03FD8EC73411}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0089366E-9183-4769-8A36-10DD4E668B37}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0089366E-9183-4769-8A36-10DD4E668B37}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0089366E-9183-4769-8A36-10DD4E668B37}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0089366E-9183-4769-8A36-10DD4E668B37}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FC3A3720-6C39-4673-8C58-6A127F82B3B2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FC3A3720-6C39-4673-8C58-6A127F82B3B2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FC3A3720-6C39-4673-8C58-6A127F82B3B2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FC3A3720-6C39-4673-8C58-6A127F82B3B2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{23346DEA-346C-4A76-A631-9E9B7E97456B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{23346DEA-346C-4A76-A631-9E9B7E97456B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{23346DEA-346C-4A76-A631-9E9B7E97456B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{23346DEA-346C-4A76-A631-9E9B7E97456B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

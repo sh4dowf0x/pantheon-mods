@@ -21,13 +21,17 @@ public sealed class CombatData : Addon
     private string _jsonLogPath = Path.Combine(DefaultOutputFolder, "combat-live-current.jsonl");
     private StreamWriter? _textWriter;
     private StreamWriter? _jsonWriter;
+    private IPlayer? _localPlayer;
+    private PlayerExperience? _lastExperience;
     private bool _isEnabled;
     private bool _includeCombatMessages = true;
     private bool _includeStructuredResults = true;
+    private bool _includeExperience = true;
     private int _maxFileMegabytes = 5;
     private DateTime _startedAt;
     private int _messageCount;
     private int _structuredCount;
+    private int _experienceCount;
     private string _lastStatus = "Combat Data idle.";
 
     public override void OnCreate()
@@ -36,6 +40,9 @@ public sealed class CombatData : Addon
         CustomChatCommands.Add("/combatdata", HandleCommand);
         ChatEvents.MessageReceived.Subscribe(OnMessageReceived);
         CombatEvents.CombatResultApplied.Subscribe(OnCombatResultApplied);
+        LocalPlayerEvents.LocalPlayerEntered.Subscribe(OnLocalPlayerEntered);
+        LocalPlayerEvents.LocalPlayerLeft.Subscribe(OnLocalPlayerLeft);
+        LocalPlayerEvents.ExperienceChanged.Subscribe(OnExperienceChanged);
         _startedAt = DateTime.Now;
         OpenLogs();
     }
@@ -57,6 +64,7 @@ public sealed class CombatData : Addon
         {
             new BoolConfigurationValue("Combat messages", "Writes rendered combat-log messages.", _includeCombatMessages, value => _includeCombatMessages = value),
             new BoolConfigurationValue("Structured results", "Writes structured combat-result events when available.", _includeStructuredResults, value => _includeStructuredResults = value),
+            new BoolConfigurationValue("Experience changes", "Writes local player experience changes.", _includeExperience, value => _includeExperience = value),
             new IntConfigurationValue("Max file MB", "Rotates live files when either log reaches this size.", _maxFileMegabytes, 1, 100, 1, value => _maxFileMegabytes = value)
         };
     }
@@ -66,6 +74,9 @@ public sealed class CombatData : Addon
         CustomChatCommands.Remove("/combatdata");
         ChatEvents.MessageReceived.Unsubscribe(OnMessageReceived);
         CombatEvents.CombatResultApplied.Unsubscribe(OnCombatResultApplied);
+        LocalPlayerEvents.LocalPlayerEntered.Unsubscribe(OnLocalPlayerEntered);
+        LocalPlayerEvents.LocalPlayerLeft.Unsubscribe(OnLocalPlayerLeft);
+        LocalPlayerEvents.ExperienceChanged.Unsubscribe(OnExperienceChanged);
         CloseLogs();
     }
 
@@ -73,14 +84,14 @@ public sealed class CombatData : Addon
     {
         if (args.Length == 0 || args[0].Equals("help", StringComparison.OrdinalIgnoreCase))
         {
-            Chat.AddInfoMessage("Combat Data: /combatdata status, path, clear, save, reopen, messages on|off, structured on|off");
+            Chat.AddInfoMessage("Combat Data: /combatdata status, path, clear, save, reopen, messages on|off, structured on|off, xp on|off");
             return;
         }
 
         switch (args[0].ToLowerInvariant())
         {
             case "status":
-                Chat.AddInfoMessage($"{_lastStatus} enabled={_isEnabled}; messages={_messageCount}; structured={_structuredCount}; buffered={_bufferedLines.Count}; cap={_maxFileMegabytes}MB");
+                Chat.AddInfoMessage($"{_lastStatus} enabled={_isEnabled}; messages={_messageCount}; structured={_structuredCount}; xp={_experienceCount}; buffered={_bufferedLines.Count}; cap={_maxFileMegabytes}MB");
                 break;
             case "path":
                 Chat.AddInfoMessage($"Combat Data text: {_textLogPath}");
@@ -103,6 +114,10 @@ public sealed class CombatData : Addon
                 break;
             case "structured":
                 HandleToggle(args, "Structured results", value => _includeStructuredResults = value, _includeStructuredResults);
+                break;
+            case "xp":
+            case "experience":
+                HandleToggle(args, "Experience changes", value => _includeExperience = value, _includeExperience);
                 break;
             default:
                 Chat.AddInfoMessage("Combat Data: unknown command. Try /combatdata help.");
@@ -165,10 +180,32 @@ public sealed class CombatData : Addon
         RecordLine("CombatResult", rendered, CreateCombatResultPayload(result, rendered));
     }
 
+    private void OnExperienceChanged(PlayerExperience experience)
+    {
+        var previous = _lastExperience;
+        _lastExperience = experience;
+
+        if (!_isEnabled || !_includeExperience)
+        {
+            return;
+        }
+
+        _experienceCount++;
+        var deltaCurrent = previous == null ? (double?)null : experience.Current - previous.Current;
+        var deltaToNext = previous == null ? (double?)null : experience.ToNextLevel - previous.ToNextLevel;
+        var deltaPercentage = previous == null ? (float?)null : experience.ExperiencePercentage - previous.ExperiencePercentage;
+        var rendered = deltaCurrent == null
+            ? $"XP current={experience.Current:F0} toNext={experience.ToNextLevel:F0} percent={experience.ExperiencePercentage:F4}"
+            : $"XP current={experience.Current:F0} delta={deltaCurrent.Value:F0} toNext={experience.ToNextLevel:F0} percent={experience.ExperiencePercentage:F4} deltaPercent={deltaPercentage.GetValueOrDefault():F4}";
+
+        RecordLine("ExperienceChanged", rendered, CreateExperiencePayload(experience, previous, rendered));
+    }
+
     private void RecordLine(string category, string rendered, Dictionary<string, object?> payload)
     {
         EnsureLogsOpen();
         RotateLogsIfNeeded();
+        AddSourceFields(payload);
 
         var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{category}] {rendered}";
         _bufferedLines.Add(line);
@@ -177,6 +214,34 @@ public sealed class CombatData : Addon
         _textWriter?.WriteLine(line);
         _jsonWriter?.WriteLine(JsonSerializer.Serialize(payload));
         _lastStatus = $"Combat Data writing to {_jsonLogPath}";
+    }
+
+    private void OnLocalPlayerEntered(IPlayer player)
+    {
+        _localPlayer = player;
+        _lastExperience = player.GetExperience();
+        OpenLogs();
+    }
+
+    private void OnLocalPlayerLeft(IPlayer player)
+    {
+        if (_localPlayer?.CharacterId == player.CharacterId)
+        {
+            _localPlayer = null;
+            _lastExperience = null;
+            OpenLogs();
+        }
+    }
+
+    private void AddSourceFields(Dictionary<string, object?> payload)
+    {
+        if (_localPlayer == null)
+        {
+            return;
+        }
+
+        payload["sourceCharacterName"] = _localPlayer.Name;
+        payload["sourceCharacterId"] = _localPlayer.CharacterId;
     }
 
     private static bool IsCombatMessage(ChatMessage message)
@@ -222,6 +287,26 @@ public sealed class CombatData : Addon
             ["combatResultType"] = result.CombatResultType,
             ["ability"] = result.AbilityName,
             ["buff"] = result.BuffName
+        };
+    }
+
+    private static Dictionary<string, object?> CreateExperiencePayload(PlayerExperience experience, PlayerExperience? previous, string rendered)
+    {
+        return new Dictionary<string, object?>
+        {
+            ["timestamp"] = DateTime.Now.ToString("O"),
+            ["category"] = "ExperienceChanged",
+            ["eventType"] = "experience",
+            ["raw"] = rendered,
+            ["current"] = experience.Current,
+            ["toNextLevel"] = experience.ToNextLevel,
+            ["experiencePercentage"] = experience.ExperiencePercentage,
+            ["previousCurrent"] = previous?.Current,
+            ["previousToNextLevel"] = previous?.ToNextLevel,
+            ["previousExperiencePercentage"] = previous?.ExperiencePercentage,
+            ["deltaCurrent"] = previous == null ? null : experience.Current - previous.Current,
+            ["deltaToNextLevel"] = previous == null ? null : experience.ToNextLevel - previous.ToNextLevel,
+            ["deltaExperiencePercentage"] = previous == null ? null : experience.ExperiencePercentage - previous.ExperiencePercentage
         };
     }
 
@@ -315,8 +400,9 @@ public sealed class CombatData : Addon
     {
         CloseLogs();
         Directory.CreateDirectory(_outputFolder);
-        _textLogPath = Path.Combine(_outputFolder, "combat-live-current.txt");
-        _jsonLogPath = Path.Combine(_outputFolder, "combat-live-current.jsonl");
+        var fileSuffix = GetCurrentFileSuffix();
+        _textLogPath = Path.Combine(_outputFolder, $"combat-live-{fileSuffix}.txt");
+        _jsonLogPath = Path.Combine(_outputFolder, $"combat-live-{fileSuffix}.jsonl");
         _textWriter = new StreamWriter(new FileStream(_textLogPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite)) { AutoFlush = true };
         _jsonWriter = new StreamWriter(new FileStream(_jsonLogPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite)) { AutoFlush = true };
         _lastStatus = $"Combat Data writing to {_jsonLogPath}";
@@ -346,6 +432,7 @@ public sealed class CombatData : Addon
         DeleteIfExists(_jsonLogPath);
         _messageCount = 0;
         _structuredCount = 0;
+        _experienceCount = 0;
         _startedAt = DateTime.Now;
         OpenLogs();
     }
@@ -431,17 +518,18 @@ public sealed class CombatData : Addon
             {
                 _jsonLogPath = configuredOutputPath;
                 _outputFolder = Path.GetDirectoryName(_jsonLogPath) ?? DefaultOutputFolder;
-                _textLogPath = Path.Combine(_outputFolder, "combat-live-current.txt");
+                _textLogPath = Path.Combine(_outputFolder, $"combat-live-{GetCurrentFileSuffix()}.txt");
             }
             else if (!string.IsNullOrWhiteSpace(configuredOutputFolder))
             {
                 _outputFolder = configuredOutputFolder;
-                _textLogPath = Path.Combine(_outputFolder, "combat-live-current.txt");
-                _jsonLogPath = Path.Combine(_outputFolder, "combat-live-current.jsonl");
+                _textLogPath = Path.Combine(_outputFolder, $"combat-live-{GetCurrentFileSuffix()}.txt");
+                _jsonLogPath = Path.Combine(_outputFolder, $"combat-live-{GetCurrentFileSuffix()}.jsonl");
             }
 
             _includeCombatMessages = config?.IncludeCombatMessages ?? _includeCombatMessages;
             _includeStructuredResults = config?.IncludeStructuredResults ?? _includeStructuredResults;
+            _includeExperience = config?.IncludeExperience ?? _includeExperience;
             _maxFileMegabytes = Math.Clamp(config?.MaxFileMegabytes ?? _maxFileMegabytes, 1, 100);
         }
         catch (Exception ex)
@@ -457,6 +545,7 @@ public sealed class CombatData : Addon
             OutputPath: null,
             IncludeCombatMessages: _includeCombatMessages,
             IncludeStructuredResults: _includeStructuredResults,
+            IncludeExperience: _includeExperience,
             MaxFileMegabytes: _maxFileMegabytes);
 
         Directory.CreateDirectory(Path.GetDirectoryName(LocalPathConfigPath) ?? _gameFolder);
@@ -477,6 +566,18 @@ public sealed class CombatData : Addon
     private static string? FirstNonBlank(params string?[] values)
     {
         return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+    }
+
+    private string GetCurrentFileSuffix()
+    {
+        return string.IsNullOrWhiteSpace(_localPlayer?.Name) ? "current" : SanitizeFileName(_localPlayer.Name);
+    }
+
+    private static string SanitizeFileName(string value)
+    {
+        var invalidChars = Path.GetInvalidFileNameChars();
+        var sanitized = new string(value.Select(ch => invalidChars.Contains(ch) ? '_' : ch).ToArray()).Trim();
+        return string.IsNullOrWhiteSpace(sanitized) ? "current" : sanitized;
     }
 
     private static string ResolveGameFolder()
@@ -509,6 +610,7 @@ public sealed class CombatData : Addon
         string? OutputPath,
         bool? IncludeCombatMessages = null,
         bool? IncludeStructuredResults = null,
+        bool? IncludeExperience = null,
         int? MaxFileMegabytes = null,
         string? DataFolder = null,
         string? Directory = null,

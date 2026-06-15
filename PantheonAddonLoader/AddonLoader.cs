@@ -5,6 +5,7 @@ using PantheonAddonFramework;
 using PantheonAddonLoader.AddonComponents;
 using PantheonAddonLoader.AddonManagement;
 using PantheonAddonLoader.Events;
+using PantheonAddonLoader.Models;
 using PantheonAddonLoader.UI;
 
 namespace PantheonAddonLoader;
@@ -21,6 +22,7 @@ public class AddonLoader : MelonMod
     public static readonly WindowPanelEvents WindowPanelEvents = new();
     public static readonly LocalPlayerEvents LocalPlayerEvents = new();
     public static readonly PlayerEvents PlayerEvents = new();
+    public static readonly EntityEvents EntityEvents = new();
     public static readonly LifecycleEvents LifecycleEvents = new();
     public static readonly ChatEvents ChatEvents = new();
     public static readonly CombatEvents CombatEvents = new();
@@ -58,6 +60,8 @@ public class AddonLoader : MelonMod
     public override void OnUpdate()
     {
         HasUpdated = true;
+        EntityRegistry.PublishPeriodicUpdates();
+        WorldItemRegistry.PublishPeriodicUpdates();
         LifecycleEvents.OnUpdate.Raise();
     }
 

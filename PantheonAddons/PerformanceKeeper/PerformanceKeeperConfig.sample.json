@@ -1,0 +1,9 @@
+{
+  "OutputFolder": "C:\\ProgramData\\PantheonPerformance",
+  "Enabled": true,
+  "RunInBackground": true,
+  "ForceVSyncOff": true,
+  "ActiveFps": 60,
+  "BackgroundFps": 30,
+  "SampleSeconds": 5
+}

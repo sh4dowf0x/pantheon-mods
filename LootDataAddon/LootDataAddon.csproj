@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <AssemblyName>LootData</AssemblyName>
+        <RootNamespace>PantheonAddons.LootData</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Compile Include="..\PantheonAddons\LootData\LootData.cs" Link="LootData.cs" />
+        <ProjectReference Include="..\PantheonAddonFramework\PantheonAddonFramework.csproj" />
+    </ItemGroup>
+
+    <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(SkipDeploy)' != 'true'">
+        <ItemGroup>
+            <FilesToCopy Include="$(TargetDir)LootData.dll" />
+        </ItemGroup>
+        <MakeDir Directories="$(GamePath)/Mods/PantheonAddons" />
+        <Copy SourceFiles="@(FilesToCopy)" DestinationFolder="$(GamePath)/Mods/PantheonAddons" />
+    </Target>
+
+</Project>

@@ -1,0 +1,9 @@
+{
+  "OutputFolder": "%PROGRAMDATA%\\PantheonEntityScanner",
+  "IncludePlayers": true,
+  "IncludeNpcs": true,
+  "IncludeGroundSpawns": true,
+  "IncludeLocalPlayer": true,
+  "MaxDistance": 300,
+  "MaxFileMegabytes": 10
+}

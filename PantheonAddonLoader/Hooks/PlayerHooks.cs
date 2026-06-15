@@ -20,6 +20,7 @@ public class PlayerNetworkStart
         }
 
         var player = new Player(__instance);
+        EntityRegistry.AddOrUpdate(__instance, "Player");
         
         if (player.IsLocalPlayer)
         {
@@ -30,6 +31,15 @@ public class PlayerNetworkStart
         }
 
         AddonLoader.PlayerEvents.PlayerAdded.Raise(player);
+    }
+}
+
+[HarmonyPatch(typeof(EntityPlayerGameObject), nameof(EntityPlayerGameObject.NetworkStop))]
+public class PlayerNetworkStop
+{
+    private static void Postfix(EntityPlayerGameObject __instance)
+    {
+        EntityRegistry.Remove(__instance, "Player");
     }
 }
 
@@ -52,15 +62,9 @@ public class TargetSetOffensiveHook
     {
         if (Globals.LocalPlayer?.Targets == __instance)
         {
-            float percent = 0;
-            if (__instance.Offensive != null)
-            {
-                var current = __instance.Offensive.Pools.GetCurrent(PoolType.Health);
-                var max = __instance.Offensive.Pools.GetMax(PoolType.Health);
-                percent = current / max * 100;
-            }              
- 
-            AddonLoader.LocalPlayerEvents.OffensiveTargetChanged.Raise(percent);
+            var snapshot = TargetPoolSnapshots.CreateTargetSnapshot("Offensive", __instance.Offensive);
+            AddonLoader.LocalPlayerEvents.OffensiveTargetChanged.Raise(snapshot.HealthPercent);
+            AddonLoader.LocalPlayerEvents.OffensiveTargetHealthChanged.Raise(snapshot);
         }
     }
 }
@@ -72,15 +76,45 @@ public class TargetSetDefensiveHook
     {
         if (Globals.LocalPlayer?.Targets == __instance)
         {
-            float percent = 0;
-            if (__instance.Defensive != null)
-            {
-                var current = __instance.Defensive.Pools.GetCurrent(PoolType.Health);
-                var max = __instance.Defensive.Pools.GetMax(PoolType.Health);
-                percent = current / max * 100;
-            }
+            var snapshot = TargetPoolSnapshots.CreateTargetSnapshot("Defensive", __instance.Defensive);
+            AddonLoader.LocalPlayerEvents.DefensiveTargetChanged.Raise(snapshot.HealthPercent);
+            AddonLoader.LocalPlayerEvents.DefensiveTargetHealthChanged.Raise(snapshot);
+        }
+    }
+}
 
-            AddonLoader.LocalPlayerEvents.DefensiveTargetChanged.Raise(percent);
+internal static class TargetPoolSnapshots
+{
+    public static TargetHealthSnapshot CreateTargetSnapshot(string targetType, IEntity? target)
+    {
+        var currentHealth = GetPoolValue(target, PoolType.Health, true);
+        var maxHealth = GetPoolValue(target, PoolType.Health, false);
+        var currentMana = GetPoolValue(target, PoolType.Mana, true);
+        var maxMana = GetPoolValue(target, PoolType.Mana, false);
+        return new TargetHealthSnapshot(
+            TargetType: targetType,
+            CurrentHealth: currentHealth,
+            MaxHealth: maxHealth,
+            HealthPercent: CalculatePercent(currentHealth, maxHealth),
+            CurrentMana: currentMana,
+            MaxMana: maxMana,
+            ManaPercent: CalculatePercent(currentMana, maxMana));
+    }
+
+    public static float CalculatePercent(float current, float max)
+    {
+        return max <= 0 ? 0 : current / max * 100;
+    }
+
+    private static float GetPoolValue(IEntity? target, PoolType poolType, bool current)
+    {
+        try
+        {
+            return target == null ? 0 : current ? target.Pools.GetCurrent(poolType) : target.Pools.GetMax(poolType);
+        }
+        catch
+        {
+            return 0;
         }
     }
 }

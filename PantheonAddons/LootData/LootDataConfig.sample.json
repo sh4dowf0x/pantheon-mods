@@ -1,0 +1,7 @@
+{
+  "OutputFolder": "C:\\ProgramData\\PantheonLootData",
+  "IncludeInventoryEvents": true,
+  "IncludeLootChat": true,
+  "IncludeRawDump": false,
+  "MaxFileMegabytes": 5
+}

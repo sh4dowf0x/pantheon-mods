@@ -1,0 +1,27 @@
+namespace PantheonAddonFramework.Models;
+
+public sealed record EntitySnapshot(
+    DateTime TimestampUtc,
+    string EventType,
+    string EntityType,
+    string RuntimeType,
+    uint NetworkId,
+    long CharacterId,
+    string Name,
+    string Title,
+    string Kind,
+    string Tier,
+    string Profession,
+    string Race,
+    string Class,
+    string Role,
+    int Level,
+    float X,
+    float Y,
+    float Z,
+    float HeadingY,
+    float HealthCurrent,
+    float HealthMax,
+    float HealthPercent,
+    float DistanceFromLocal,
+    bool IsLocalPlayer);

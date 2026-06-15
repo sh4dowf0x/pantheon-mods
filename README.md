@@ -2,17 +2,61 @@
 
 # Pantheon Mods
 
-This fork contains two standalone Pantheon addon DLLs built on top of the experimental Pantheon addon framework:
+This fork contains standalone Pantheon addon DLLs built on top of the experimental Pantheon addon framework. Each addon can be installed independently, or all current addons can be installed together from the all-mods package.
 
-- `FollowBeacon.dll`: shared-location auto-follow assist for two local or networked Pantheon clients.
-- `MacroRelay.dll`: remote macro hotbar/relay for triggering macros on another client through a shared request file.
+## Packaged mods
 
-Ready-to-install zip packages are kept in `dist/`:
+Ready-to-install zip packages are kept in `dist/`.
 
-- `PantheonAutoFollowMod.zip`
-- `PantheonMacroRelayMod.zip`
+| Package | Addon DLL | Purpose |
+| --- | --- | --- |
+| `PantheonAllMods.zip` | all current addon DLLs | Installs every packaged addon in one pass. |
+| `PantheonAutoFollowMod.zip` | `FollowBeacon.dll` | Shares leader position between Pantheon clients and can show follower guidance or optional conservative follow assist. |
+| `PantheonMacroRelayMod.zip` | `MacroRelay.dll` | Relays named macro requests between local or networked clients through a shared file and optional hotbar. |
+| `PantheonEntityScannerMod.zip` | `EntityScanner.dll` | Exports nearby player, NPC, ground-spawn, and local-character snapshots to JSONL. |
+| `PantheonCombatDataMod.zip` | `CombatData.dll` | Exports rendered combat log lines, structured combat-result events, and XP changes. |
+| `PantheonLootDataMod.zip` | `LootData.dll` | Exports inventory item changes, item snapshots, and loot-like chat lines. |
+| `PantheonPerformanceKeeperMod.zip` | `PerformanceKeeper.dll` | Keeps unfocused clients updating and applies separate active/background FPS targets. |
+| `PantheonTargetHealthBarsMod.zip` | `TargetHealthBars.dll` | Adds numeric health and mana text to offensive and defensive target bars. |
 
-The mods are intentionally split into separate addon DLLs so either one can be installed or removed independently. Install addon DLLs into the game-local `Mods\PantheonAddons` folder. AppData is kept for legacy addon loading and runtime/shared data files. If upgrading from an older combined build, remove `%APPDATA%\PantheonAddons\PantheonAddons.dll` before installing these DLLs.
+Addon-specific notes live beside each addon:
+
+- `PantheonAddons/FollowBeacon/README.md`
+- `PantheonAddons/MacroRelay/README.md`
+- `PantheonAddons/EntityScanner/README.md`
+- `PantheonAddons/CombatData/README.md`
+- `PantheonAddons/LootData/README.md`
+- `PantheonAddons/PerformanceKeeper/README.md`
+- `PantheonAddons/TargetHealthBars/README.md`
+
+## Installing packaged mods
+
+Install MelonLoader first, using the MelonLoader instructions below. Run Pantheon once after installing MelonLoader so it can generate its support libraries, then close the game.
+
+To install one packaged mod:
+
+1. Download the desired zip from `dist/`.
+2. Extract the zip into the Pantheon game folder so its `GameFolder` contents merge with the game folder.
+3. Confirm the shared files landed at `Mods\PantheonAddonLoader.dll` and `UserLibs\PantheonAddonFramework.dll`.
+4. Confirm the addon DLL landed under `Mods\PantheonAddons`.
+5. Start the game and use the addon's chat commands or config file to adjust behavior.
+
+To install every packaged mod, use `PantheonAllMods.zip` and extract it the same way.
+
+The mods are intentionally split into separate addon DLLs so any one can be installed or removed independently. Addon DLLs install into the game-local `Mods\PantheonAddons` folder. Runtime data may still use `%APPDATA%`, `%PROGRAMDATA%`, or `%PUBLIC%` depending on the addon.
+
+When upgrading from older combined or AppData-based builds, remove stale addon DLLs from `%APPDATA%\PantheonAddons`, especially:
+
+- `PantheonAddons.dll`
+- `FollowBeacon.dll`
+- `MacroRelay.dll`
+- `EntityScanner.dll`
+- `CombatData.dll`
+- `LootData.dll`
+- `PerformanceKeeper.dll`
+- `TargetHealthBars.dll`
+
+Keep addon config files under `GameFolder\Mods\PantheonAddons`. Most packages include a default config file next to the addon DLL.
 
 # Pantheon Addons
 This project is an **experimental, third party, unofficial addon API** for Pantheon: Rise of the Fallen. Its primary purpose is to create addons in the game via a readonly API which alter or create user interface objects. It is designed to blend in with the overall design of the native user interface, enhancing the game without breaking immersion.

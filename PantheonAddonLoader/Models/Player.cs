@@ -61,6 +61,16 @@ public class Player : IPlayer
         return CreateTargetSnapshot(_entityPlayerGameObject.Targets?.Defensive);
     }
 
+    public TargetHealthSnapshot GetOffensiveTargetHealth()
+    {
+        return CreateTargetHealthSnapshot("Offensive", _entityPlayerGameObject.Targets?.Offensive);
+    }
+
+    public TargetHealthSnapshot GetDefensiveTargetHealth()
+    {
+        return CreateTargetHealthSnapshot("Defensive", _entityPlayerGameObject.Targets?.Defensive);
+    }
+
     public bool TrySetOffensiveTarget(TargetSnapshot? target)
     {
         if (_entityPlayerGameObject == null || !IsLocalPlayer || target == null || target.NetworkId == 0)
@@ -216,5 +226,38 @@ public class Player : IPlayer
         {
             return null;
         }
+    }
+
+    private static TargetHealthSnapshot CreateTargetHealthSnapshot(string targetType, IEntity? entity)
+    {
+        var currentHealth = GetPoolValue(entity, PoolType.Health, true);
+        var maxHealth = GetPoolValue(entity, PoolType.Health, false);
+        var currentMana = GetPoolValue(entity, PoolType.Mana, true);
+        var maxMana = GetPoolValue(entity, PoolType.Mana, false);
+        return new TargetHealthSnapshot(
+            TargetType: targetType,
+            CurrentHealth: currentHealth,
+            MaxHealth: maxHealth,
+            HealthPercent: CalculatePercent(currentHealth, maxHealth),
+            CurrentMana: currentMana,
+            MaxMana: maxMana,
+            ManaPercent: CalculatePercent(currentMana, maxMana));
+    }
+
+    private static float GetPoolValue(IEntity? entity, PoolType poolType, bool current)
+    {
+        try
+        {
+            return entity == null ? 0 : current ? entity.Pools.GetCurrent(poolType) : entity.Pools.GetMax(poolType);
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    private static float CalculatePercent(float current, float max)
+    {
+        return max <= 0 ? 0 : current / max * 100;
     }
 }

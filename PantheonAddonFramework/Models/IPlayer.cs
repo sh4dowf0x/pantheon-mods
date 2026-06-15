@@ -30,6 +30,10 @@ public interface IPlayer
 
     TargetSnapshot? GetDefensiveTarget();
 
+    TargetHealthSnapshot GetOffensiveTargetHealth();
+
+    TargetHealthSnapshot GetDefensiveTargetHealth();
+
     bool TrySetOffensiveTarget(TargetSnapshot? target);
 
     bool TrySetDefensiveTarget(TargetSnapshot? target);

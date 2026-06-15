@@ -10,6 +10,8 @@ public class LocalPlayerEvents : ILocalPlayerEvents
     public AddonEvent<PlayerExperience> ExperienceChanged { get; } = new();
     public AddonEvent<float> OffensiveTargetChanged { get; } = new();
     public AddonEvent<float> DefensiveTargetChanged { get; } = new();
+    public AddonEvent<TargetHealthSnapshot> OffensiveTargetHealthChanged { get; } = new();
+    public AddonEvent<TargetHealthSnapshot> DefensiveTargetHealthChanged { get; } = new();
     public AddonEvent<IInventoryItem> ItemAdded { get; } = new();
     public AddonEvent<IInventoryItem> ItemRemoved { get; } = new();
 }

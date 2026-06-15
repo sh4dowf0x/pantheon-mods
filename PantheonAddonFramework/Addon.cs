@@ -18,6 +18,7 @@ public abstract class Addon : IDisposable
     public IWindowPanelEvents WindowPanelEvents { get; set; }
     public ILocalPlayerEvents LocalPlayerEvents { get; set; }
     public IPlayerEvents PlayerEvents { get; set; }
+    public IEntityEvents EntityEvents { get; set; }
     public ILifecycleEvents LifecycleEvents { get; set; }
     public IChatEvents ChatEvents { get; set; }
     public ICombatEvents CombatEvents { get; set; }
