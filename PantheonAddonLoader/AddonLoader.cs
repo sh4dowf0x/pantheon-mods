@@ -61,6 +61,7 @@ public class AddonLoader : MelonMod
     {
         HasUpdated = true;
         EntityRegistry.PublishPeriodicUpdates();
+        WorldItemRegistry.PublishPeriodicUpdates();
         LifecycleEvents.OnUpdate.Raise();
     }
 

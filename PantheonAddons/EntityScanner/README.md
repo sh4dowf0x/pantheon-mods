@@ -1,6 +1,6 @@
 # Pantheon Entity Scanner
 
-Exports nearby player, NPC, and local-character snapshots to JSONL for external parsers or database import.
+Exports nearby player, NPC, ground-spawn, and local-character snapshots to JSONL for external parsers, radar overlays, or database import.
 
 ## Install
 
@@ -32,5 +32,8 @@ Before the character is loaded, it may briefly use `entities-live-current.jsonl`
 - `/entityscan reopen`
 - `/entityscan players on|off`
 - `/entityscan npcs on|off`
+- `/entityscan ground on|off`
 - `/entityscan local on|off`
 - `/entityscan distance <meters|0>`
+
+Ground spawns are discovered by a once-per-second scan of loaded `NetworkWorldItem` objects rather than by patching the game's fragile environment lifecycle. They are written with `EntityType` set to `GroundSpawn`.

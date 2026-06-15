@@ -7,7 +7,12 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <Compile Include="../PantheonAddonLoader/NullableAttribute.cs" Link="NullableAttribute.cs" />
+      <Compile Include="../PantheonAddonLoader/NullableContextAttribute.cs" Link="NullableContextAttribute.cs" />
       <ProjectReference Include="../PantheonAddonFramework/PantheonAddonFramework.csproj" />
+      <Reference Include="UnityEngine.CoreModule">
+        <HintPath>$(GamePath)/MelonLoader/Il2CppAssemblies/UnityEngine.CoreModule.dll</HintPath>
+      </Reference>
     </ItemGroup>
 
     <PropertyGroup>

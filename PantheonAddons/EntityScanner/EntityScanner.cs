@@ -6,7 +6,7 @@ using System.Text.Json;
 
 namespace PantheonAddons.EntityScanner;
 
-[AddonMetadata("Entity Scanner", "Codex", "Exports nearby player, NPC, and local character snapshots to JSONL")]
+[AddonMetadata("Entity Scanner", "Codex", "Exports nearby player, NPC, ground spawn, and local character snapshots to JSONL")]
 public sealed class EntityScanner : Addon
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
@@ -24,6 +24,7 @@ public sealed class EntityScanner : Addon
     private bool _isEnabled;
     private bool _includePlayers = true;
     private bool _includeNpcs = true;
+    private bool _includeGroundSpawns = true;
     private bool _includeLocalPlayer = true;
     private float _maxDistance = 300f;
     private int _maxFileMegabytes = 10;
@@ -63,6 +64,7 @@ public sealed class EntityScanner : Addon
         {
             new BoolConfigurationValue("Players", "Writes player entity snapshots.", _includePlayers, value => _includePlayers = value),
             new BoolConfigurationValue("NPCs", "Writes NPC entity snapshots.", _includeNpcs, value => _includeNpcs = value),
+            new BoolConfigurationValue("Ground spawns", "Writes ground interactable entity snapshots such as chests, crates, harvest nodes, and quest objects.", _includeGroundSpawns, value => _includeGroundSpawns = value),
             new BoolConfigurationValue("Local player", "Writes this character's own position and character info.", _includeLocalPlayer, value => _includeLocalPlayer = value),
             new IntConfigurationValue("Max file MB", "Rotates live JSONL when it reaches this size.", _maxFileMegabytes, 1, 250, 1, value => _maxFileMegabytes = value)
         };
@@ -84,7 +86,7 @@ public sealed class EntityScanner : Addon
     {
         if (args.Length == 0 || args[0].Equals("help", StringComparison.OrdinalIgnoreCase))
         {
-            Chat.AddInfoMessage("Entity Scanner: /entityscan status, path, clear, save, reopen, players on|off, npcs on|off, local on|off, distance <meters|0>");
+            Chat.AddInfoMessage("Entity Scanner: /entityscan status, path, clear, save, reopen, players on|off, npcs on|off, ground on|off, local on|off, distance <meters|0>");
             return;
         }
 
@@ -113,6 +115,11 @@ public sealed class EntityScanner : Addon
                 break;
             case "npcs":
                 HandleToggle(args, "NPCs", value => _includeNpcs = value, _includeNpcs);
+                break;
+            case "ground":
+            case "grounds":
+            case "groundspawns":
+                HandleToggle(args, "Ground spawns", value => _includeGroundSpawns = value, _includeGroundSpawns);
                 break;
             case "local":
                 HandleToggle(args, "Local player", value => _includeLocalPlayer = value, _includeLocalPlayer);
@@ -239,6 +246,11 @@ public sealed class EntityScanner : Addon
         }
 
         if (snapshot.EntityType.Equals("NPC", StringComparison.OrdinalIgnoreCase) && !_includeNpcs)
+        {
+            return false;
+        }
+
+        if (snapshot.EntityType.Equals("GroundSpawn", StringComparison.OrdinalIgnoreCase) && !_includeGroundSpawns)
         {
             return false;
         }
@@ -387,6 +399,7 @@ public sealed class EntityScanner : Addon
 
             _includePlayers = config?.IncludePlayers ?? _includePlayers;
             _includeNpcs = config?.IncludeNpcs ?? _includeNpcs;
+            _includeGroundSpawns = config?.IncludeGroundSpawns ?? _includeGroundSpawns;
             _includeLocalPlayer = config?.IncludeLocalPlayer ?? _includeLocalPlayer;
             _maxDistance = Math.Clamp(config?.MaxDistance ?? _maxDistance, 0f, 10000f);
             _maxFileMegabytes = Math.Clamp(config?.MaxFileMegabytes ?? _maxFileMegabytes, 1, 250);
@@ -403,6 +416,7 @@ public sealed class EntityScanner : Addon
             OutputFolder: _outputFolder,
             IncludePlayers: _includePlayers,
             IncludeNpcs: _includeNpcs,
+            IncludeGroundSpawns: _includeGroundSpawns,
             IncludeLocalPlayer: _includeLocalPlayer,
             MaxDistance: _maxDistance,
             MaxFileMegabytes: _maxFileMegabytes);
@@ -468,6 +482,7 @@ public sealed class EntityScanner : Addon
         string? OutputFolder,
         bool? IncludePlayers = null,
         bool? IncludeNpcs = null,
+        bool? IncludeGroundSpawns = null,
         bool? IncludeLocalPlayer = null,
         float? MaxDistance = null,
         int? MaxFileMegabytes = null,
