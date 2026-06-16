@@ -12,7 +12,8 @@ One client writes its local player position to a shared JSON file, and another c
 - `/followbeacon show`: show the Follow Beacon window.
 - `/followbeacon hide`: hide the Follow Beacon window.
 - `/followbeacon status`: show current mode and shared file path.
-- `/followbeacon path`: show the shared file path.
+- `/followbeacon path`: show the config file, active beacon folder, active beacon file, and input log path.
+- `/followbeacon reloadconfig`: reload `FollowBeaconConfig.json` without restarting the client.
 - `/followbeacon once`: write one leader beacon immediately.
 - `/followbeacon distance <meters>`: set the desired follower distance from the leader.
 - `/followbeacon input on|off`: enable or disable manual movement input awareness for `W/A/S/D` and `Q/E`.
@@ -60,7 +61,7 @@ The leader writes:
 
 The file is written atomically through a temporary file so the follower should not read partial JSON.
 
-To override the shared folder, edit `GameFolder\Mods\PantheonAddons\FollowBeaconConfig.json` before starting the game:
+To override the shared folder, edit `GameFolder\Mods\PantheonAddons\FollowBeaconConfig.json`:
 
 ```json
 {
@@ -68,4 +69,12 @@ To override the shared folder, edit `GameFolder\Mods\PantheonAddons\FollowBeacon
 }
 ```
 
-The config is read when the addon starts. Restart the client after changing it. `/followbeacon path` shows the active shared file and config file locations.
+`BeaconFolder` sets the directory that contains `leader-location.json` and `input-events.jsonl`. To set the exact beacon filename instead, use `BeaconPath`:
+
+```json
+{
+  "BeaconPath": "C:\\pantheonmods\\leader-location.json"
+}
+```
+
+The config is read when the addon starts, and `/followbeacon reloadconfig` reloads it while the client is running. `/followbeacon path` shows whether the config was loaded and the exact active paths.

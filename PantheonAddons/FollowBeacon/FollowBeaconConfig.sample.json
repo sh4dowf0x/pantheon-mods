@@ -1,3 +1,4 @@
 {
-  "BeaconFolder": "%APPDATA%\\PantheonAddons\\FollowBeacon"
+  "BeaconFolder": "%APPDATA%\\PantheonAddons\\FollowBeacon",
+  "BeaconPath": null
 }

@@ -21,6 +21,7 @@ public sealed class FollowBeacon : Addon
     private string _beaconFolder = DefaultBeaconFolder;
     private string _beaconPath = Path.Combine(DefaultBeaconFolder, "leader-location.json");
     private string _inputLogPath = Path.Combine(DefaultBeaconFolder, "input-events.jsonl");
+    private string _pathConfigStatus = "Using default Follow Beacon paths.";
     private IPlayer? _localPlayer;
     private IAddonWindow? _window;
     private IAddonWindow? _controlsWindow;
@@ -148,7 +149,7 @@ public sealed class FollowBeacon : Addon
     {
         if (args.Length == 0 || args[0].Equals("help", StringComparison.OrdinalIgnoreCase))
         {
-            Chat.AddInfoMessage("Follow Beacon: /followbeacon leader, follower, off, resetleader, show, hide, controls show|hide, status, path, once, distance <meters>, input on|off, debug on|off, probe <input> <seconds>, assist on|off");
+            Chat.AddInfoMessage("Follow Beacon: /followbeacon leader, follower, off, resetleader, show, hide, controls show|hide, status, path, reloadconfig, once, distance <meters>, input on|off, debug on|off, probe <input> <seconds>, assist on|off");
             return;
         }
 
@@ -182,11 +183,19 @@ public sealed class FollowBeacon : Addon
                 HandleControlsCommand(args);
                 break;
             case "status":
-                Chat.AddInfoMessage($"{_statusLine} File: {_beaconPath}");
+                Chat.AddInfoMessage(_statusLine);
+                ReportPathConfiguration();
                 break;
             case "path":
-                Chat.AddInfoMessage($"Follow Beacon file: {_beaconPath}");
-                Chat.AddInfoMessage($"Follow Beacon config: {LocalPathConfigPath}");
+                ReportPathConfiguration();
+                break;
+            case "reloadconfig":
+            case "reload":
+                LoadPathConfig();
+                _lastRead = DateTime.MinValue;
+                _lastWrite = DateTime.MinValue;
+                Chat.AddInfoMessage("Follow Beacon config reloaded.");
+                ReportPathConfiguration();
                 break;
             case "once":
                 WriteBeacon(true);
@@ -289,7 +298,7 @@ public sealed class FollowBeacon : Addon
 
         if (notifyChat)
         {
-            SafeAddInfoMessage($"{_statusLine} Shared file: {_beaconPath}");
+            SafeAddInfoMessage($"{_statusLine} Beacon file: {_beaconPath}");
         }
 
         if (_mode == DisabledMode)
@@ -1428,9 +1437,15 @@ public sealed class FollowBeacon : Addon
 
     private void LoadPathConfig()
     {
+        _beaconFolder = DefaultBeaconFolder;
+        _beaconPath = Path.Combine(_beaconFolder, "leader-location.json");
+        _inputLogPath = Path.Combine(_beaconFolder, "input-events.jsonl");
+        _pathConfigStatus = "Using default Follow Beacon paths.";
+
         var configPath = LocalPathConfigPath;
         if (!File.Exists(configPath))
         {
+            TryWriteDefaultPathConfig(configPath);
             return;
         }
 
@@ -1450,24 +1465,55 @@ public sealed class FollowBeacon : Addon
             {
                 _beaconPath = configuredBeaconPath;
                 _beaconFolder = Path.GetDirectoryName(_beaconPath) ?? DefaultBeaconFolder;
+                _pathConfigStatus = $"Loaded BeaconPath from {configPath}.";
             }
             else if (!string.IsNullOrWhiteSpace(configuredBeaconFolder))
             {
                 _beaconFolder = configuredBeaconFolder;
                 _beaconPath = Path.Combine(_beaconFolder, "leader-location.json");
+                _pathConfigStatus = $"Loaded BeaconFolder from {configPath}.";
             }
 
             _inputLogPath = Path.Combine(_beaconFolder, "input-events.jsonl");
 
             if (string.IsNullOrWhiteSpace(configuredBeaconPath) && string.IsNullOrWhiteSpace(configuredBeaconFolder))
             {
-                SafeAddInfoMessage($"Follow Beacon config did not set BeaconFolder or BeaconPath, using default: {_beaconPath}");
+                _pathConfigStatus = $"Config at {configPath} did not set BeaconFolder or BeaconPath; using defaults.";
+                SafeAddInfoMessage($"{_pathConfigStatus} Beacon file: {_beaconPath}");
             }
         }
         catch (Exception ex)
         {
+            _pathConfigStatus = $"Could not read config at {configPath}; using defaults.";
             Logger.Error($"Follow Beacon path config failed: {ex}");
             SafeAddInfoMessage($"Follow Beacon could not read config at {configPath}; using default path: {_beaconPath}");
+        }
+    }
+
+    private void ReportPathConfiguration()
+    {
+        Chat.AddInfoMessage($"Follow Beacon config: {LocalPathConfigPath}");
+        Chat.AddInfoMessage($"Follow Beacon config status: {_pathConfigStatus}");
+        Chat.AddInfoMessage($"Follow Beacon folder: {_beaconFolder}");
+        Chat.AddInfoMessage($"Follow Beacon beacon file: {_beaconPath}");
+        Chat.AddInfoMessage($"Follow Beacon input log: {_inputLogPath}");
+    }
+
+    private void TryWriteDefaultPathConfig(string configPath)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(configPath) ?? _gameFolder);
+            var config = new PathConfig(
+                BeaconFolder: DefaultBeaconFolder,
+                BeaconPath: null);
+            File.WriteAllText(configPath, JsonSerializer.Serialize(config, JsonOptions));
+            _pathConfigStatus = $"Created default config at {configPath}.";
+        }
+        catch (Exception ex)
+        {
+            _pathConfigStatus = $"Config missing at {configPath}; using defaults.";
+            Logger.Error($"Follow Beacon default config creation failed: {ex}");
         }
     }
 
