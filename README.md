@@ -41,7 +41,7 @@ To install one packaged mod:
 4. Confirm the addon DLL landed under `Mods\PantheonAddons`.
 5. Start the game and use the addon's chat commands or config file to adjust behavior.
 
-To install every packaged mod, use `PantheonAllMods.zip` and extract it the same way.
+To install every packaged mod, use `PantheonAllMods.zip` and extract it the same way. The all-mods package is a single installable `GameFolder` tree, not a bundle of nested zip files.
 
 The mods are intentionally split into separate addon DLLs so any one can be installed or removed independently. Addon DLLs install into the game-local `Mods\PantheonAddons` folder. Runtime data may still use `%APPDATA%`, `%PROGRAMDATA%`, or `%PUBLIC%` depending on the addon.
 

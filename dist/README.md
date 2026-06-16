@@ -13,9 +13,9 @@ This folder contains ready-to-install zip packages:
 | `PantheonPerformanceKeeperMod.zip` | `PerformanceKeeper.dll` | Keeps unfocused clients updating with separate active/background FPS targets. |
 | `PantheonTargetHealthBarsMod.zip` | `TargetHealthBars.dll` | Adds numeric health and mana text to target bars. |
 
-Use `PantheonAllMods.zip` to download every current split mod package at once, or use an individual zip when you only want one mod.
+Use `PantheonAllMods.zip` to install every current split mod with one extract, or use an individual zip when you only want one mod.
 
-Each zip contains:
+Each individual mod zip contains:
 
 - the shared `PantheonAddonLoader.dll`
 - the shared `PantheonAddonFramework.dll`
@@ -23,6 +23,8 @@ Each zip contains:
 - that addon's config file
 - install notes
 
-Extract the zip into the Pantheon game folder so the zip's `GameFolder` contents merge with the game folder. Addon DLLs belong in `GameFolder\Mods\PantheonAddons`; shared loader files belong in `GameFolder\Mods` and `GameFolder\UserLibs`.
+`PantheonAllMods.zip` contains the shared loader/framework files, every current addon DLL, every addon config file, and install notes in a single `GameFolder` tree.
+
+Extract the zip into the Pantheon game folder so the zip's `GameFolder` contents merge with the game folder. Addon DLLs and config files belong in `GameFolder\Mods\PantheonAddons`; shared loader files belong in `GameFolder\Mods` and `GameFolder\UserLibs`.
 
 Addon DLLs now install into `GameFolder\Mods\PantheonAddons`. Remove older `%APPDATA%\PantheonAddons\PantheonAddons.dll`, `%APPDATA%\PantheonAddons\FollowBeacon.dll`, `%APPDATA%\PantheonAddons\MacroRelay.dll`, `%APPDATA%\PantheonAddons\EntityScanner.dll`, `%APPDATA%\PantheonAddons\CombatData.dll`, `%APPDATA%\PantheonAddons\LootData.dll`, `%APPDATA%\PantheonAddons\PerformanceKeeper.dll`, or `%APPDATA%\PantheonAddons\TargetHealthBars.dll` files before installing these split packages.
