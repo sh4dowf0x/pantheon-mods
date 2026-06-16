@@ -14,6 +14,7 @@ public sealed record ItemSnapshot(
     IReadOnlyDictionary<string, string?> Instance,
     IReadOnlyDictionary<string, string?> Template,
     IReadOnlyList<IReadOnlyDictionary<string, string?>> StatModifiers,
+    IReadOnlyList<IReadOnlyDictionary<string, string?>> InstanceStatModifiers,
     IReadOnlyList<IReadOnlyDictionary<string, string?>> MultiplierModifiers,
     IReadOnlyList<IReadOnlyDictionary<string, string?>> RequirementOverrides,
     IReadOnlyDictionary<string, object?> RawItemDump,

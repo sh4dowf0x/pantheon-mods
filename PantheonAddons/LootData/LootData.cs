@@ -2,6 +2,8 @@ using PantheonAddonFramework;
 using PantheonAddonFramework.Configuration;
 using PantheonAddonFramework.Models;
 using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -17,7 +19,6 @@ public sealed class LootData : Addon
     private IPlayer? _localPlayer;
     private string _outputFolder = DefaultOutputFolder;
     private string _eventsPath = Path.Combine(DefaultOutputFolder, "loot-events-current.jsonl");
-    private StreamWriter? _eventsWriter;
     private bool _isEnabled;
     private bool _includeInventoryEvents = true;
     private bool _includeLootChat = true;
@@ -26,10 +27,14 @@ public sealed class LootData : Addon
     private int _inventoryEventCount;
     private int _lootChatCount;
     private readonly Queue<IInventoryItem> _pendingSnapshotItems = new();
+    private readonly Dictionary<long, AcquisitionSource> _recentEntitiesByCharacterId = new();
+    private readonly Queue<LootChatClue> _recentLootChatClues = new();
     private int _pendingSnapshotTotal;
     private int _pendingSnapshotWritten;
     private bool _snapshotInProgress;
     private string _lastStatus = "Loot Data idle.";
+    private AcquisitionSource? _lastOffensiveTarget;
+    private DateTime _lastOffensiveTargetUtc = DateTime.MinValue;
 
     public override void OnCreate()
     {
@@ -38,6 +43,11 @@ public sealed class LootData : Addon
         LocalPlayerEvents.LocalPlayerEntered.Subscribe(OnLocalPlayerEntered);
         LocalPlayerEvents.ItemAdded.Subscribe(OnItemAdded);
         LocalPlayerEvents.ItemRemoved.Subscribe(OnItemRemoved);
+        LocalPlayerEvents.OffensiveTargetChanged.Subscribe(OnOffensiveTargetChanged);
+        LocalPlayerEvents.OffensiveTargetHealthChanged.Subscribe(OnOffensiveTargetHealthChanged);
+        EntityEvents.EntitySeen.Subscribe(OnEntitySeen);
+        EntityEvents.EntityUpdated.Subscribe(OnEntityUpdated);
+        EntityEvents.EntityRemoved.Subscribe(OnEntityRemoved);
         ChatEvents.MessageReceived.Subscribe(OnMessageReceived);
         LifecycleEvents.OnUpdate.Subscribe(OnUpdate);
         OpenLog();
@@ -71,6 +81,11 @@ public sealed class LootData : Addon
         LocalPlayerEvents.LocalPlayerEntered.Unsubscribe(OnLocalPlayerEntered);
         LocalPlayerEvents.ItemAdded.Unsubscribe(OnItemAdded);
         LocalPlayerEvents.ItemRemoved.Unsubscribe(OnItemRemoved);
+        LocalPlayerEvents.OffensiveTargetChanged.Unsubscribe(OnOffensiveTargetChanged);
+        LocalPlayerEvents.OffensiveTargetHealthChanged.Unsubscribe(OnOffensiveTargetHealthChanged);
+        EntityEvents.EntitySeen.Unsubscribe(OnEntitySeen);
+        EntityEvents.EntityUpdated.Unsubscribe(OnEntityUpdated);
+        EntityEvents.EntityRemoved.Unsubscribe(OnEntityRemoved);
         ChatEvents.MessageReceived.Unsubscribe(OnMessageReceived);
         LifecycleEvents.OnUpdate.Unsubscribe(OnUpdate);
         CloseLog();
@@ -176,6 +191,31 @@ public sealed class LootData : Addon
         WritePayload("item_removed", item);
     }
 
+    private void OnOffensiveTargetChanged(float _)
+    {
+        CaptureOffensiveTarget();
+    }
+
+    private void OnOffensiveTargetHealthChanged(TargetHealthSnapshot _)
+    {
+        CaptureOffensiveTarget();
+    }
+
+    private void OnEntitySeen(EntitySnapshot entity)
+    {
+        TrackEntity(entity);
+    }
+
+    private void OnEntityUpdated(EntitySnapshot entity)
+    {
+        TrackEntity(entity);
+    }
+
+    private void OnEntityRemoved(EntitySnapshot entity)
+    {
+        TrackEntity(entity);
+    }
+
     private void OnMessageReceived(ChatMessage message)
     {
         if (!_isEnabled || !_includeLootChat || !LooksLikeLootMessage(message))
@@ -184,6 +224,14 @@ public sealed class LootData : Addon
         }
 
         _lootChatCount++;
+        var parsed = ParseLootMessage(message.Message);
+        var itemName = parsed.TryGetValue("item", out var parsedItem) ? parsedItem : null;
+        if (!string.IsNullOrWhiteSpace(itemName))
+        {
+            _recentLootChatClues.Enqueue(new LootChatClue(DateTime.UtcNow, message.Sender, message.Message, parsed));
+            PruneLootChatClues();
+        }
+
         WriteEvent(new Dictionary<string, object?>
         {
             ["timestamp"] = DateTime.Now.ToString("O"),
@@ -193,7 +241,8 @@ public sealed class LootData : Addon
             ["chatChannel"] = message.ChatChannelType,
             ["sender"] = message.Sender,
             ["message"] = message.Message,
-            ["parsed"] = ParseLootMessage(message.Message)
+            ["parsed"] = parsed,
+            ["acquisitionContext"] = BuildCurrentAcquisitionContext()
         });
     }
 
@@ -202,23 +251,244 @@ public sealed class LootData : Addon
         ItemSnapshot? snapshot = null;
         try
         {
-        snapshot = item.GetSnapshot(_includeRawDump);
+            snapshot = item.GetSnapshot(_includeRawDump);
         }
         catch (Exception ex)
         {
             Logger.Error($"Loot Data item snapshot failed: {ex}");
         }
 
+        var itemId = SafeRead(() => item.Id);
+        var itemName = SafeRead(() => item.Name);
+        var resolvedItemName = string.IsNullOrWhiteSpace(itemName) ? snapshot?.Name : itemName;
         WriteEvent(new Dictionary<string, object?>
         {
             ["timestamp"] = DateTime.Now.ToString("O"),
             ["eventType"] = eventType,
             ["character"] = _localPlayer?.Name,
             ["characterId"] = _localPlayer?.CharacterId,
-            ["itemInstanceId"] = item.Id,
-            ["itemName"] = item.Name,
+            ["itemInstanceId"] = itemId == Guid.Empty ? snapshot?.InstanceId : itemId,
+            ["itemName"] = resolvedItemName,
+            ["acquisition"] = ResolveAcquisition(eventType, snapshot, resolvedItemName),
             ["item"] = snapshot
         });
+    }
+
+    private void TrackEntity(EntitySnapshot entity)
+    {
+        if (entity.CharacterId == 0)
+        {
+            return;
+        }
+
+        _recentEntitiesByCharacterId[entity.CharacterId] = AcquisitionSource.FromEntity(entity, DateTime.UtcNow);
+        PruneEntityMemory();
+    }
+
+    private void CaptureOffensiveTarget()
+    {
+        var target = _localPlayer?.GetOffensiveTarget();
+        if (target == null || target.CharacterId == 0)
+        {
+            return;
+        }
+
+        _lastOffensiveTargetUtc = DateTime.UtcNow;
+        if (_recentEntitiesByCharacterId.TryGetValue(target.CharacterId, out var entitySource))
+        {
+            _lastOffensiveTarget = entitySource with
+            {
+                Name = string.IsNullOrWhiteSpace(target.Name) ? entitySource.Name : target.Name,
+                NetworkId = target.NetworkId == 0 ? entitySource.NetworkId : target.NetworkId,
+                LastSeenUtc = _lastOffensiveTargetUtc
+            };
+            return;
+        }
+
+        _lastOffensiveTarget = new AcquisitionSource(
+            Name: target.Name,
+            CharacterId: target.CharacterId,
+            NetworkId: target.NetworkId,
+            EntityType: "OffensiveTarget",
+            Level: 0,
+            X: null,
+            Y: null,
+            Z: null,
+            DistanceFromLocal: null,
+            HealthPercent: null,
+            LastSeenUtc: _lastOffensiveTargetUtc);
+    }
+
+    private Dictionary<string, object?>? ResolveAcquisition(string eventType, ItemSnapshot? item, string? itemName)
+    {
+        if (!eventType.Equals("item_added", StringComparison.OrdinalIgnoreCase) || item == null)
+        {
+            return null;
+        }
+
+        PruneEntityMemory();
+        PruneLootChatClues();
+
+        var evidence = new List<string>();
+        AcquisitionSource? source = null;
+        var method = "unknown";
+        var confidence = "none";
+
+        if (item.CorpseId != 0 && _recentEntitiesByCharacterId.TryGetValue(item.CorpseId, out var corpseSource))
+        {
+            source = corpseSource;
+            method = "corpse_id_entity_match";
+            confidence = "high";
+            evidence.Add($"item.corpseId matched recent entity characterId {item.CorpseId}");
+        }
+
+        var lootChatClue = FindMatchingLootChatClue(itemName);
+        if (lootChatClue != null)
+        {
+            evidence.Add($"recent loot chat matched item '{lootChatClue.ItemName}'");
+
+            if (source == null && !string.IsNullOrWhiteSpace(lootChatClue.SourceName))
+            {
+                source = FindRecentEntityByName(lootChatClue.SourceName);
+                method = source == null ? "loot_chat_source_name" : "loot_chat_source_entity_match";
+                confidence = source == null ? "medium" : "high";
+                evidence.Add($"loot chat source '{lootChatClue.SourceName}'");
+            }
+            else if (source == null)
+            {
+                method = "loot_chat_item_match";
+                confidence = "medium";
+            }
+        }
+
+        if (source == null && _lastOffensiveTarget != null && DateTime.UtcNow - _lastOffensiveTargetUtc <= TimeSpan.FromSeconds(30))
+        {
+            source = _lastOffensiveTarget;
+            method = "recent_offensive_target";
+            confidence = "low";
+            evidence.Add("used offensive target seen within 30 seconds of item add");
+        }
+
+        if (source == null && item.CorpseId != 0)
+        {
+            method = "corpse_id_only";
+            confidence = "low";
+            evidence.Add($"item carried corpseId {item.CorpseId}, but no matching entity was still remembered");
+        }
+
+        return new Dictionary<string, object?>
+        {
+            ["method"] = method,
+            ["confidence"] = confidence,
+            ["corpseId"] = item.CorpseId == 0 ? null : item.CorpseId,
+            ["source"] = source == null ? null : SourceToPayload(source),
+            ["lootChat"] = lootChatClue == null ? null : lootChatClue.ToPayload(),
+            ["evidence"] = evidence
+        };
+    }
+
+    private Dictionary<string, object?> BuildCurrentAcquisitionContext()
+    {
+        return new Dictionary<string, object?>
+        {
+            ["offensiveTarget"] = _lastOffensiveTarget == null ? null : SourceToPayload(_lastOffensiveTarget),
+            ["offensiveTargetAgeSeconds"] = _lastOffensiveTarget == null ? null : Math.Round((DateTime.UtcNow - _lastOffensiveTargetUtc).TotalSeconds, 1)
+        };
+    }
+
+    private ResolvedLootChatClue? FindMatchingLootChatClue(string? itemName)
+    {
+        if (string.IsNullOrWhiteSpace(itemName))
+        {
+            return null;
+        }
+
+        foreach (var clue in _recentLootChatClues.Reverse())
+        {
+            if (DateTime.UtcNow - clue.TimestampUtc > TimeSpan.FromSeconds(12))
+            {
+                continue;
+            }
+
+            clue.Parsed.TryGetValue("item", out var parsedItem);
+            if (!IsSameItemName(itemName, parsedItem))
+            {
+                continue;
+            }
+
+            clue.Parsed.TryGetValue("source", out var sourceName);
+            return new ResolvedLootChatClue(clue.TimestampUtc, clue.Sender, clue.Message, parsedItem, sourceName);
+        }
+
+        return null;
+    }
+
+    private AcquisitionSource? FindRecentEntityByName(string sourceName)
+    {
+        return _recentEntitiesByCharacterId.Values
+            .Where(source => source.Name.Equals(sourceName, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(source => Math.Abs(source.DistanceFromLocal ?? float.MaxValue))
+            .ThenByDescending(source => source.LastSeenUtc)
+            .FirstOrDefault();
+    }
+
+    private static bool IsSameItemName(string? left, string? right)
+    {
+        var normalizedLeft = NormalizeLootText(left);
+        var normalizedRight = NormalizeLootText(right);
+        return !string.IsNullOrWhiteSpace(normalizedLeft)
+            && !string.IsNullOrWhiteSpace(normalizedRight)
+            && (normalizedLeft.Equals(normalizedRight, StringComparison.OrdinalIgnoreCase)
+                || normalizedLeft.Contains(normalizedRight, StringComparison.OrdinalIgnoreCase)
+                || normalizedRight.Contains(normalizedLeft, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string NormalizeLootText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "";
+        }
+
+        var trimmed = Regex.Replace(value, @"^\s*(?:an?|the)\s+", "", RegexOptions.IgnoreCase).Trim();
+        trimmed = Regex.Replace(trimmed, @"\s+x\d+\s*$", "", RegexOptions.IgnoreCase).Trim();
+        return trimmed.Trim('.', '!', '"', '\'');
+    }
+
+    private void PruneEntityMemory()
+    {
+        var cutoff = DateTime.UtcNow.AddMinutes(-5);
+        foreach (var key in _recentEntitiesByCharacterId.Where(pair => pair.Value.LastSeenUtc < cutoff).Select(pair => pair.Key).ToArray())
+        {
+            _recentEntitiesByCharacterId.Remove(key);
+        }
+    }
+
+    private void PruneLootChatClues()
+    {
+        var cutoff = DateTime.UtcNow.AddSeconds(-30);
+        while (_recentLootChatClues.Count > 0 && _recentLootChatClues.Peek().TimestampUtc < cutoff)
+        {
+            _recentLootChatClues.Dequeue();
+        }
+    }
+
+    private static Dictionary<string, object?> SourceToPayload(AcquisitionSource source)
+    {
+        return new Dictionary<string, object?>
+        {
+            ["name"] = source.Name,
+            ["characterId"] = source.CharacterId == 0 ? null : source.CharacterId,
+            ["networkId"] = source.NetworkId == 0 ? null : source.NetworkId,
+            ["entityType"] = source.EntityType,
+            ["level"] = source.Level == 0 ? null : source.Level,
+            ["x"] = source.X,
+            ["y"] = source.Y,
+            ["z"] = source.Z,
+            ["distanceFromLocal"] = source.DistanceFromLocal,
+            ["healthPercent"] = source.HealthPercent,
+            ["lastSeenUtc"] = source.LastSeenUtc.ToString("O")
+        };
     }
 
     private void WriteInventorySnapshot()
@@ -272,10 +542,30 @@ public sealed class LootData : Addon
 
     private void WriteEvent(Dictionary<string, object?> payload)
     {
-        EnsureLogOpen();
-        RotateLogIfNeeded();
-        _eventsWriter?.WriteLine(JsonSerializer.Serialize(payload));
-        _lastStatus = $"Loot Data writing to {_eventsPath}";
+        try
+        {
+            EnsureLogOpen();
+            var line = JsonSerializer.Serialize(payload);
+            WriteEventLine(line);
+            _lastStatus = $"Loot Data writing to {_eventsPath}";
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Loot Data write failed: {ex}");
+            _lastStatus = $"Loot Data write failed: {ex.GetType().Name}";
+        }
+    }
+
+    private static T? SafeRead<T>(Func<T> read)
+    {
+        try
+        {
+            return read();
+        }
+        catch
+        {
+            return default;
+        }
     }
 
     private static bool LooksLikeLootMessage(ChatMessage message)
@@ -291,11 +581,12 @@ public sealed class LootData : Addon
     private static Dictionary<string, string?> ParseLootMessage(string message)
     {
         var parsed = new Dictionary<string, string?>();
-        var received = Regex.Match(message, @"^(?<who>.+?) (?:receives|received|loots|looted|obtains|obtained|acquires|acquired|won) (?<item>.+?)(?: x(?<quantity>\d+))?\.?$", RegexOptions.IgnoreCase);
+        var received = Regex.Match(message, @"^(?<who>.+?) (?:receives|received|loots|looted|obtains|obtained|acquires|acquired|won) (?<item>.+?)(?:\s+(?:from|off|on)\s+(?<source>.+?))?(?: x(?<quantity>\d+))?\.?$", RegexOptions.IgnoreCase);
         if (received.Success)
         {
             parsed["who"] = received.Groups["who"].Value;
-            parsed["item"] = received.Groups["item"].Value;
+            parsed["item"] = NormalizeLootText(received.Groups["item"].Value);
+            parsed["source"] = received.Groups["source"].Success ? NormalizeLootText(received.Groups["source"].Value) : null;
             parsed["quantity"] = received.Groups["quantity"].Success ? received.Groups["quantity"].Value : null;
         }
 
@@ -307,35 +598,40 @@ public sealed class LootData : Addon
         CloseLog();
         Directory.CreateDirectory(_outputFolder);
         _eventsPath = Path.Combine(_outputFolder, "loot-events-current.jsonl");
-        _eventsWriter = new StreamWriter(new FileStream(_eventsPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite)) { AutoFlush = true };
+        WithLogMutex(() =>
+        {
+            if (!File.Exists(_eventsPath))
+            {
+                using var _ = new FileStream(_eventsPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+            }
+        });
         _lastStatus = $"Loot Data writing to {_eventsPath}";
     }
 
     private void EnsureLogOpen()
     {
-        if (_eventsWriter == null)
-        {
-            OpenLog();
-        }
+        Directory.CreateDirectory(_outputFolder);
     }
 
     private void CloseLog()
     {
-        _eventsWriter?.Dispose();
-        _eventsWriter = null;
     }
 
     private void ClearLog()
     {
-        CloseLog();
-        if (File.Exists(_eventsPath))
+        WithLogMutex(() =>
         {
-            File.Delete(_eventsPath);
-        }
+            if (File.Exists(_eventsPath))
+            {
+                File.Delete(_eventsPath);
+            }
+
+            using var _ = new FileStream(_eventsPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+        });
 
         _inventoryEventCount = 0;
         _lootChatCount = 0;
-        OpenLog();
+        _lastStatus = $"Loot Data writing to {_eventsPath}";
     }
 
     private void RotateLogIfNeeded()
@@ -346,7 +642,6 @@ public sealed class LootData : Addon
             return;
         }
 
-        CloseLog();
         var previousPath = $"{_eventsPath}.previous";
         if (File.Exists(previousPath))
         {
@@ -354,7 +649,57 @@ public sealed class LootData : Addon
         }
 
         File.Move(_eventsPath, previousPath);
-        OpenLog();
+    }
+
+    private void WriteEventLine(string line)
+    {
+        WithLogMutex(() =>
+        {
+            RotateLogIfNeeded();
+            using var stream = new FileStream(_eventsPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+            using var writer = new StreamWriter(stream, Encoding.UTF8);
+            writer.WriteLine(line);
+        });
+    }
+
+    private void WithLogMutex(Action action)
+    {
+        var mutexName = BuildLogMutexName(_eventsPath);
+        using var mutex = new Mutex(false, mutexName);
+        var hasHandle = false;
+
+        try
+        {
+            try
+            {
+                hasHandle = mutex.WaitOne(TimeSpan.FromSeconds(10));
+                if (!hasHandle)
+                {
+                    throw new TimeoutException($"Timed out waiting for Loot Data log lock: {mutexName}");
+                }
+            }
+            catch (AbandonedMutexException)
+            {
+                hasHandle = true;
+            }
+
+            action();
+        }
+        finally
+        {
+            if (hasHandle)
+            {
+                mutex.ReleaseMutex();
+            }
+        }
+    }
+
+    private static string BuildLogMutexName(string path)
+    {
+        var fullPath = Path.GetFullPath(path).ToUpperInvariant();
+        var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(fullPath));
+        var hash = Convert.ToHexString(hashBytes);
+        return $"PantheonLootData-{hash}";
     }
 
     private void LoadPathConfig()
@@ -448,4 +793,51 @@ public sealed class LootData : Addon
         string? DataFolder = null,
         string? Directory = null,
         string? Folder = null);
+
+    private sealed record AcquisitionSource(
+        string Name,
+        long CharacterId,
+        uint NetworkId,
+        string EntityType,
+        int Level,
+        float? X,
+        float? Y,
+        float? Z,
+        float? DistanceFromLocal,
+        float? HealthPercent,
+        DateTime LastSeenUtc)
+    {
+        public static AcquisitionSource FromEntity(EntitySnapshot entity, DateTime seenUtc)
+        {
+            return new AcquisitionSource(
+                Name: entity.Name,
+                CharacterId: entity.CharacterId,
+                NetworkId: entity.NetworkId,
+                EntityType: entity.EntityType,
+                Level: entity.Level,
+                X: entity.X,
+                Y: entity.Y,
+                Z: entity.Z,
+                DistanceFromLocal: entity.DistanceFromLocal,
+                HealthPercent: entity.HealthPercent,
+                LastSeenUtc: seenUtc);
+        }
+    }
+
+    private sealed record LootChatClue(DateTime TimestampUtc, string Sender, string Message, Dictionary<string, string?> Parsed);
+
+    private sealed record ResolvedLootChatClue(DateTime TimestampUtc, string Sender, string Message, string? ItemName, string? SourceName)
+    {
+        public Dictionary<string, object?> ToPayload()
+        {
+            return new Dictionary<string, object?>
+            {
+                ["timestampUtc"] = TimestampUtc.ToString("O"),
+                ["sender"] = Sender,
+                ["message"] = Message,
+                ["itemName"] = ItemName,
+                ["sourceName"] = SourceName
+            };
+        }
+    }
 }
