@@ -1,0 +1,38 @@
+{
+  "RelayFolder": "%PROGRAMDATA%\\PantheonMacroRelay",
+  "VisibleSlots": 6,
+  "ReceiverEnabled": false,
+  "TargetSyncEnabled": true,
+  "Slots": [
+    {
+      "Label": "Slot 1",
+      "Macro": "",
+      "Shortcut": "Ctrl+F1"
+    },
+    {
+      "Label": "Slot 2",
+      "Macro": "",
+      "Shortcut": "Ctrl+F2"
+    },
+    {
+      "Label": "Slot 3",
+      "Macro": "",
+      "Shortcut": "Ctrl+F3"
+    },
+    {
+      "Label": "Slot 4",
+      "Macro": "",
+      "Shortcut": "Ctrl+F4"
+    },
+    {
+      "Label": "Slot 5",
+      "Macro": "",
+      "Shortcut": "Ctrl+F5"
+    },
+    {
+      "Label": "Slot 6",
+      "Macro": "",
+      "Shortcut": "Ctrl+F6"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "OutputFolder": "%PROGRAMDATA%\\PantheonCombatData",
+  "IncludeCombatMessages": true,
+  "IncludeStructuredResults": true,
+  "IncludeExperience": true,
+  "MaxFileMegabytes": 5
+}
