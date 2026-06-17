@@ -207,7 +207,29 @@ public class Player : IPlayer
         return flags;
     }
 
-    public bool IsLocalPlayer => _entityPlayerGameObject.NetworkId.Value == EntityPlayerGameObject.LocalPlayerId.Value;
+    public bool IsLocalPlayer
+    {
+        get
+        {
+            var networkId = _entityPlayerGameObject.NetworkId.Value;
+            if (networkId != 0 && networkId == EntityPlayerGameObject.LocalPlayerId.Value)
+            {
+                return true;
+            }
+
+            try
+            {
+                var localPlayer = EntityPlayerGameObject.LocalPlayer;
+                return localPlayer != null
+                    && localPlayer.Pointer != IntPtr.Zero
+                    && localPlayer.Pointer == _entityPlayerGameObject.Pointer;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
 
     private static TargetSnapshot? CreateTargetSnapshot(IEntity? entity)
     {

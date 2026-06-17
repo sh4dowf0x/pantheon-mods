@@ -5,6 +5,7 @@ using PantheonAddonFramework;
 using PantheonAddonLoader.AddonComponents;
 using PantheonAddonLoader.AddonManagement;
 using PantheonAddonLoader.Events;
+using PantheonAddonLoader.Hooks;
 using PantheonAddonLoader.Models;
 using PantheonAddonLoader.UI;
 
@@ -60,6 +61,7 @@ public class AddonLoader : MelonMod
     public override void OnUpdate()
     {
         HasUpdated = true;
+        LocalPlayerTracker.SyncFromGameState();
         EntityRegistry.PublishPeriodicUpdates();
         WorldItemRegistry.PublishPeriodicUpdates();
         LifecycleEvents.OnUpdate.Raise();
