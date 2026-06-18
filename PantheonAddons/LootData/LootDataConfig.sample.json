@@ -3,5 +3,8 @@
   "IncludeInventoryEvents": true,
   "IncludeLootChat": true,
   "IncludeRawDump": false,
+  "ExportIcons": false,
+  "IconProbe": false,
+  "IconOutputFolder": "C:\\ProgramData\\PantheonLootData\\icons",
   "MaxFileMegabytes": 5
 }

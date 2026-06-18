@@ -15,7 +15,7 @@ Ready-to-install zip packages are kept in `dist/`.
 | `PantheonMacroRelayMod.zip` | `MacroRelay.dll` | Relays named macro requests between local or networked clients through a shared file and optional hotbar. |
 | `PantheonEntityScannerMod.zip` | `EntityScanner.dll` | Exports nearby player, NPC, ground-spawn, and local-character snapshots to JSONL. |
 | `PantheonCombatDataMod.zip` | `CombatData.dll` | Exports rendered combat log lines, structured combat-result events, and XP changes. |
-| `PantheonLootDataMod.zip` | `LootData.dll` | Exports inventory item changes, item snapshots, and loot-like chat lines. |
+| `PantheonLootDataMod.zip` | `LootData.dll` | Exports inventory item changes, item snapshots, loot-like chat lines, and optional deduplicated item icon PNGs. |
 | `PantheonPerformanceKeeperMod.zip` | `PerformanceKeeper.dll` | Keeps unfocused clients updating and applies separate active/background FPS targets. |
 | `PantheonTargetHealthBarsMod.zip` | `TargetHealthBars.dll` | Adds numeric health and mana text to offensive and defensive target bars. |
 
