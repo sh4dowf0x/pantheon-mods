@@ -33,7 +33,7 @@ To override the output folder, edit `GameFolder\Mods\PantheonAddons\LootDataConf
   "IncludeInventoryEvents": true,
   "IncludeLootChat": true,
   "IncludeRawDump": false,
-  "ExportIcons": false,
+  "ExportIcons": true,
   "IconProbe": false,
   "IconOutputFolder": "C:\\pantheonmods\\loot-data\\icons",
   "MaxFileMegabytes": 5
@@ -42,4 +42,4 @@ To override the output folder, edit `GameFolder\Mods\PantheonAddons\LootDataConf
 
 Restart the client after changing the config. `/lootdata path` shows the active output and config file locations.
 
-When icon export is enabled, loot events include an `icon` object with the item's `iconKey`, the deduplicated relative `iconFile`, and an export status. PNGs are only written once per unique icon key. Loot Data also writes `loot-icons-current.jsonl` beside the main event log so importers can build an icon-key-to-file mapping without scanning every loot event.
+Icon export is enabled by default. Loot events include an `icon` object with the item's `iconKey`, the deduplicated relative `iconFile`, and an export status. PNGs are only written once per unique icon key. Loot Data also writes `loot-icons-current.jsonl` beside the main event log so importers can build an icon-key-to-file mapping without scanning every loot event.

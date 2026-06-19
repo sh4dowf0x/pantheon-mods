@@ -8,7 +8,7 @@ This folder contains ready-to-install zip packages:
 | `PantheonAutoFollowMod.zip` | `FollowBeacon.dll` | Shares leader position between clients and shows follower guidance or optional conservative follow assist. |
 | `PantheonCombatDataMod.zip` | `CombatData.dll` | Exports combat messages, structured combat events, and XP changes. |
 | `PantheonEntityScannerMod.zip` | `EntityScanner.dll` | Exports player, NPC, ground-spawn, and local-character snapshots. |
-| `PantheonLootDataMod.zip` | `LootData.dll` | Exports inventory item changes, item snapshots, loot-like chat lines, and optional deduplicated item icon PNGs. |
+| `PantheonLootDataMod.zip` | `LootData.dll` | Exports inventory item changes, item snapshots, loot-like chat lines, and deduplicated item icon PNGs by default. |
 | `PantheonMacroRelayMod.zip` | `MacroRelay.dll` | Relays named macro requests between clients through a shared file and optional hotbar. |
 | `PantheonPerformanceKeeperMod.zip` | `PerformanceKeeper.dll` | Keeps unfocused clients updating with separate active/background FPS targets. |
 | `PantheonTargetHealthBarsMod.zip` | `TargetHealthBars.dll` | Adds numeric health and mana text to target bars. |

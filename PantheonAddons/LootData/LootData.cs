@@ -24,7 +24,7 @@ public sealed class LootData : Addon
     private bool _includeInventoryEvents = true;
     private bool _includeLootChat = true;
     private bool _includeRawDump;
-    private bool _exportIcons;
+    private bool _exportIcons = true;
     private bool _iconProbe;
     private string _iconOutputFolder = Path.Combine(DefaultOutputFolder, "icons");
     private string _iconManifestPath = Path.Combine(DefaultOutputFolder, "loot-icons-current.jsonl");
