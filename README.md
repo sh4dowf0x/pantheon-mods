@@ -33,6 +33,20 @@ Addon-specific notes live beside each addon:
 
 Install MelonLoader first, using the MelonLoader instructions below. Run Pantheon once after installing MelonLoader so it can generate its support libraries, then close the game.
 
+For PTR testers, the easiest path is:
+
+1. Download or clone this repository.
+2. Close Pantheon.
+3. Run `install-latest-pantheon-mods.bat`.
+
+The installer downloads the newest public `PantheonAllMods.zip` from GitHub releases, detects common standalone and Steam PTR folders, and installs the loader, framework, and addon DLLs into the selected game folder. Existing addon config files are preserved; missing default config files are added.
+
+If auto-detection cannot find the PTR folder, pass it explicitly:
+
+```bat
+install-latest-pantheon-mods.bat "C:\Path\To\Pantheon PTR"
+```
+
 To install one packaged mod:
 
 1. Download the desired zip from `dist/`.
