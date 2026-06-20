@@ -13,6 +13,12 @@ public sealed class FollowBeacon : Addon
     private const string DisabledMode = "Off";
     private const string LeaderMode = "Leader";
     private const string FollowerMode = "Follower";
+    private const int ControlsWindowWidth = 188;
+    private const int ControlsWindowHeight = 56;
+    private const float ControlButtonSize = 42;
+    private const float ControlButtonGap = 8;
+    private const float ControlsTopX = 285;
+    private const float ControlsTopY = 1010;
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private static readonly JsonSerializerOptions JsonLineOptions = new();
     private static readonly JsonSerializerOptions PathConfigJsonOptions = new() { PropertyNameCaseInsensitive = true };
@@ -1263,20 +1269,26 @@ public sealed class FollowBeacon : Addon
 
         try
         {
-            _controlsWindow = CustomUI.CreateWindow("Follow Controls", 290, 175);
-            _controlsWindow.AddResizeHandle(520, 260, 250, 130);
+            _controlsWindow = CustomUI.CreateWindow("Follow", ControlsWindowWidth, ControlsWindowHeight);
+            _controlsWindow.SetPosition(ControlsTopX, ControlsTopY);
 
-            _leaderButton = _controlsWindow.AddButtonComponent("Leader", () => SetMode(1));
-            _leaderButton.SetSize(220, 32);
-            _leaderButton.SetPosition(0, 32);
+            var buttonStep = ControlButtonSize + ControlButtonGap;
+            var rightX = buttonStep;
 
-            _followerButton = _controlsWindow.AddButtonComponent("Follower", () => SetMode(2));
-            _followerButton.SetSize(220, 32);
-            _followerButton.SetPosition(0, -4);
+            _assistButton = _controlsWindow.AddButtonComponent(">>", ToggleAssistFromButton);
+            _assistButton.SetSize(ControlButtonSize, ControlButtonSize);
+            _assistButton.SetPosition(rightX, -2);
+            _assistButton.SetFontSize(17);
 
-            _assistButton = _controlsWindow.AddButtonComponent("Auto-Follow", ToggleAssistFromButton);
-            _assistButton.SetSize(220, 32);
-            _assistButton.SetPosition(0, -40);
+            _followerButton = _controlsWindow.AddButtonComponent("<-", () => SetMode(2));
+            _followerButton.SetSize(ControlButtonSize, ControlButtonSize);
+            _followerButton.SetPosition(0, -2);
+            _followerButton.SetFontSize(17);
+
+            _leaderButton = _controlsWindow.AddButtonComponent("*", () => SetMode(1));
+            _leaderButton.SetSize(ControlButtonSize, ControlButtonSize);
+            _leaderButton.SetPosition(-rightX, -2);
+            _leaderButton.SetFontSize(18);
 
             _controlsWindow.Enable(true);
             RefreshControlButtons();
@@ -1328,9 +1340,9 @@ public sealed class FollowBeacon : Addon
 
     private void RefreshControlButtons()
     {
-        _leaderButton?.SetText(_mode == LeaderMode ? "Leader: ON" : "Leader");
-        _followerButton?.SetText(_mode == FollowerMode ? "Follower: ON" : "Follower");
-        _assistButton?.SetText(_assistEnabled ? "Auto-Follow: ON" : "Auto-Follow");
+        _leaderButton?.SetText(_mode == LeaderMode ? "* ON" : "*");
+        _followerButton?.SetText(_mode == FollowerMode ? "< ON" : "<-");
+        _assistButton?.SetText(_assistEnabled ? ">> ON" : ">>");
     }
 
     private void SafeAddInfoMessage(string message)

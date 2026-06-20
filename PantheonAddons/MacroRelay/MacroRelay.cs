@@ -577,41 +577,41 @@ public sealed class MacroRelay : Addon
             return;
         }
 
-        const float buttonWidth = 108;
-        const float buttonHeight = 42;
-        const float gap = 8;
+        const float buttonWidth = 94;
+        const float buttonHeight = 34;
+        const float gap = 5;
         const int rowsPerColumn = 12;
         var visibleCount = Math.Clamp(_visibleSlotCount, 1, Math.Max(1, _slots.Length));
         _visibleSlotCount = visibleCount;
         var columns = (int)Math.Ceiling(visibleCount / (double)rowsPerColumn);
         var rows = Math.Min(rowsPerColumn, visibleCount);
-        var hotbarWidth = 25 + (columns * buttonWidth) + ((columns - 1) * gap);
-        var hotbarHeight = 85 + (rows * (buttonHeight + gap));
+        var hotbarWidth = 22 + (columns * buttonWidth) + ((columns - 1) * gap);
+        var hotbarHeight = 68 + (rows * (buttonHeight + gap));
         _hotbarWindow.SetWidth(hotbarWidth);
         _hotbarWindow.SetHeight(hotbarHeight);
 
-        var topY = (hotbarHeight / 2.0f) - 38.0f;
+        var topY = (hotbarHeight / 2.0f) - 31.0f;
         _receiverToggleButton = _hotbarWindow.AddButtonComponent("", ToggleReceiver);
-        _receiverToggleButton.SetSize(38, 24);
-        _receiverToggleButton.SetFontSize(11);
-        _receiverToggleButton.SetPosition(-48, topY);
+        _receiverToggleButton.SetSize(34, 22);
+        _receiverToggleButton.SetFontSize(10);
+        _receiverToggleButton.SetPosition(-42, topY);
         _hotbarButtons.Add(_receiverToggleButton);
         RefreshReceiverButton(true);
 
         var removeButton = _hotbarWindow.AddButtonComponent("-", RemoveHotbarSlot);
-        removeButton.SetSize(38, 24);
-        removeButton.SetFontSize(16);
+        removeButton.SetSize(34, 22);
+        removeButton.SetFontSize(15);
         removeButton.SetPosition(0, topY);
         _hotbarButtons.Add(removeButton);
 
         var addButton = _hotbarWindow.AddButtonComponent("+", AddHotbarSlot);
-        addButton.SetSize(38, 24);
-        addButton.SetFontSize(16);
-        addButton.SetPosition(48, topY);
+        addButton.SetSize(34, 22);
+        addButton.SetFontSize(15);
+        addButton.SetPosition(42, topY);
         _hotbarButtons.Add(addButton);
 
         var startX = -((columns - 1) * (buttonWidth + gap)) / 2.0f;
-        var startY = topY - 39.0f;
+        var startY = topY - 32.0f;
 
         for (var i = 0; i < visibleCount; i++)
         {
@@ -621,7 +621,7 @@ public sealed class MacroRelay : Addon
             var row = i % rowsPerColumn;
             var button = _hotbarWindow.AddButtonComponent(GetSlotButtonText(slot), () => ActivateSlot(slotIndex, true), () => OpenSlotEditor(slotIndex));
             button.SetSize(buttonWidth, buttonHeight);
-            button.SetFontSize(12);
+            button.SetFontSize(10.5f);
             button.SetPosition(startX + (column * (buttonWidth + gap)), startY - (row * (buttonHeight + gap)));
             _hotbarButtons.Add(button);
         }
@@ -857,8 +857,7 @@ public sealed class MacroRelay : Addon
             return;
         }
 
-        var slotNumber = _slots.Length + 1;
-        _slots = _slots.Append(new HotbarSlot($"Slot {slotNumber}", "", $"Ctrl+F{Math.Min(slotNumber, 12)}", GetDefaultKeyCode(slotNumber), true, false, false)).ToArray();
+        _slots = _slots.Append(CreateDefaultSlot(_slots.Length + 1)).ToArray();
         _visibleSlotCount = _slots.Length;
         SavePathConfig();
         RebuildHotbar();
@@ -1112,12 +1111,12 @@ public sealed class MacroRelay : Addon
             return defaultSlots;
         }
 
-        var count = Math.Clamp(configuredSlots.Length, 1, defaultSlots.Length);
+        var count = Math.Max(1, configuredSlots.Length);
         var slots = new HotbarSlot[count];
         for (var i = 0; i < count; i++)
         {
             var configured = configuredSlots[i];
-            var fallback = defaultSlots[i];
+            var fallback = i < defaultSlots.Length ? defaultSlots[i] : CreateDefaultSlot(i + 1);
             var parsed = ParseShortcut(configured.Shortcut);
             var keyCode = configured.KeyCode > 0 ? configured.KeyCode : parsed.KeyCode > 0 ? parsed.KeyCode : fallback.KeyCode;
             var ctrl = configured.Ctrl ?? parsed.Ctrl ?? fallback.Ctrl;
@@ -1169,10 +1168,24 @@ public sealed class MacroRelay : Addon
         };
     }
 
+    private static HotbarSlot CreateDefaultSlot(int slotNumber)
+    {
+        var keyCode = GetDefaultKeyCode(slotNumber);
+        return new HotbarSlot($"Slot {slotNumber}", "", $"Ctrl+{GetKeyName(keyCode)}", keyCode, true, false, false);
+    }
+
     private static string GetSlotButtonText(HotbarSlot slot)
     {
         var label = string.IsNullOrWhiteSpace(slot.Label) ? "Macro" : slot.Label;
-        return $"{label}{Environment.NewLine}{slot.Shortcut}";
+        return $"{label}{Environment.NewLine}{CompactShortcut(slot.Shortcut)}";
+    }
+
+    private static string CompactShortcut(string shortcut)
+    {
+        return shortcut
+            .Replace("Ctrl", "C", StringComparison.OrdinalIgnoreCase)
+            .Replace("Alt", "A", StringComparison.OrdinalIgnoreCase)
+            .Replace("Shift", "S", StringComparison.OrdinalIgnoreCase);
     }
 
     private bool IsSlotHotkeyPressed(HotbarSlot slot)
