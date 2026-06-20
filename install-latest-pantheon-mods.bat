@@ -8,18 +8,18 @@ set "DOWNLOAD_URL=https://github.com/%REPO%/releases/latest/download/%PACKAGE%"
 echo Pantheon Mods latest-release installer
 echo.
 
-if not "%~1"=="" (
-    set "TARGET=%~1"
-    if not exist "!TARGET!\Pantheon.exe" (
-        echo ERROR: The supplied folder does not look like a Pantheon game folder:
-        echo !TARGET!
-        echo.
-        echo Usage: %~nx0 "C:\Path\To\Pantheon PTR"
-        goto :fail_no_work
-    )
-    goto :install
-)
+if "%~1"=="" goto :detect_target
 
+set "TARGET=%~1"
+if exist "%TARGET%\Pantheon.exe" goto :install
+
+echo ERROR: The supplied folder does not look like a Pantheon game folder:
+echo %TARGET%
+echo.
+echo Usage: %~nx0 "C:\Path\To\Pantheon PTR"
+goto :fail_no_work
+
+:detect_target
 set "COUNT=0"
 call :maybe_add "C:\PantheonPTR\App" "Standalone PTR"
 call :maybe_add "%ProgramFiles(x86)%\Steam\steamapps\common\Pantheon Rise of the Fallen (PTR)" "Steam PTR"
@@ -27,14 +27,15 @@ call :maybe_add "%ProgramFiles%\Steam\steamapps\common\Pantheon Rise of the Fall
 call :maybe_add "D:\SteamLibrary\steamapps\common\Pantheon Rise of the Fallen (PTR)" "Steam PTR"
 call :maybe_add "E:\SteamLibrary\steamapps\common\Pantheon Rise of the Fallen (PTR)" "Steam PTR"
 
-if "%COUNT%"=="0" (
-    echo ERROR: Could not auto-detect a PTR install folder.
-    echo.
-    echo Run this again with the PTR folder path:
-    echo %~nx0 "C:\Path\To\Pantheon PTR"
-    goto :fail_no_work
-)
+if not "%COUNT%"=="0" goto :target_found
 
+echo ERROR: Could not auto-detect a PTR install folder.
+echo.
+echo Run this again with the PTR folder path:
+echo %~nx0 "C:\Path\To\Pantheon PTR"
+goto :fail_no_work
+
+:target_found
 if "%COUNT%"=="1" (
     set "TARGET=!CANDIDATE_1!"
     goto :install
@@ -47,10 +48,12 @@ for /L %%I in (1,1,%COUNT%) do (
 )
 echo.
 set /P "CHOICE=Install to which folder? [1-%COUNT%]: "
-if not defined CANDIDATE_%CHOICE% (
-    echo ERROR: Invalid selection.
-    goto :fail_no_work
-)
+if defined CANDIDATE_%CHOICE% goto :choice_ok
+
+echo ERROR: Invalid selection.
+goto :fail_no_work
+
+:choice_ok
 set "TARGET=!CANDIDATE_%CHOICE%!"
 goto :install
 
@@ -165,20 +168,25 @@ for /L %%I in (1,1,%PRESERVED_COUNT%) do echo     !REPORT_Preserved_%%I!
 echo.
 exit /b 0
 
-:wait_to_close
-echo.
-pause
-exit /b %~1
-
 :fail_no_work
-call :wait_to_close 1
+set "EXIT_CODE=1"
+goto :wait_to_close
 
 :fail
 echo.
 echo Install failed. If Pantheon is running, close it and try again.
 if exist "%WORK%" rmdir /S /Q "%WORK%" >nul 2>nul
-call :wait_to_close 1
+set "EXIT_CODE=1"
+goto :wait_to_close
 
 :cleanup_success
 if exist "%WORK%" rmdir /S /Q "%WORK%" >nul 2>nul
-call :wait_to_close 0
+set "EXIT_CODE=0"
+goto :wait_to_close
+
+:wait_to_close
+if "%PANTHEON_MODS_NO_PAUSE%"=="1" exit /b %EXIT_CODE%
+echo.
+echo Press any key to close this installer.
+pause >nul
+exit /b %EXIT_CODE%
