@@ -15,7 +15,7 @@ if not "%~1"=="" (
         echo !TARGET!
         echo.
         echo Usage: %~nx0 "C:\Path\To\Pantheon PTR"
-        exit /b 1
+        goto :fail_no_work
     )
     goto :install
 )
@@ -32,7 +32,7 @@ if "%COUNT%"=="0" (
     echo.
     echo Run this again with the PTR folder path:
     echo %~nx0 "C:\Path\To\Pantheon PTR"
-    exit /b 1
+    goto :fail_no_work
 )
 
 if "%COUNT%"=="1" (
@@ -49,7 +49,7 @@ echo.
 set /P "CHOICE=Install to which folder? [1-%COUNT%]: "
 if not defined CANDIDATE_%CHOICE% (
     echo ERROR: Invalid selection.
-    exit /b 1
+    goto :fail_no_work
 )
 set "TARGET=!CANDIDATE_%CHOICE%!"
 goto :install
@@ -77,8 +77,12 @@ mkdir "%WORK%" >nul 2>nul
 if errorlevel 1 (
     echo ERROR: Could not create temp folder:
     echo %WORK%
-    exit /b 1
+    goto :fail_no_work
 )
+
+set "REPLACED_COUNT=0"
+set "ADDED_COUNT=0"
+set "PRESERVED_COUNT=0"
 
 echo Downloading latest %PACKAGE%...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%DOWNLOAD_URL%' -OutFile '%ZIP%' -UseBasicParsing } catch { Write-Error $_; exit 1 }"
@@ -99,39 +103,82 @@ mkdir "%TARGET%\Mods\PantheonAddons" >nul 2>nul
 mkdir "%TARGET%\UserLibs" >nul 2>nul
 
 echo Installing loader and framework...
-copy /Y "%EXTRACTED%\GameFolder\Mods\PantheonAddonLoader.dll" "%TARGET%\Mods\PantheonAddonLoader.dll" >nul
+call :copy_file "%EXTRACTED%\GameFolder\Mods\PantheonAddonLoader.dll" "%TARGET%\Mods\PantheonAddonLoader.dll"
 if errorlevel 1 goto :fail
-copy /Y "%EXTRACTED%\GameFolder\UserLibs\PantheonAddonFramework.dll" "%TARGET%\UserLibs\PantheonAddonFramework.dll" >nul
+call :copy_file "%EXTRACTED%\GameFolder\UserLibs\PantheonAddonFramework.dll" "%TARGET%\UserLibs\PantheonAddonFramework.dll"
 if errorlevel 1 goto :fail
 
 echo Installing addon DLLs...
 for %%F in ("%EXTRACTED%\GameFolder\Mods\PantheonAddons\*.dll") do (
-    copy /Y "%%~fF" "%TARGET%\Mods\PantheonAddons\%%~nxF" >nul
+    call :copy_file "%%~fF" "%TARGET%\Mods\PantheonAddons\%%~nxF"
     if errorlevel 1 goto :fail
 )
 
 echo Installing missing default configs, preserving existing configs...
 for %%F in ("%EXTRACTED%\GameFolder\Mods\PantheonAddons\*Config.json") do (
     if exist "%TARGET%\Mods\PantheonAddons\%%~nxF" (
-        echo   Keeping existing %%~nxF
+        call :record_preserved "%TARGET%\Mods\PantheonAddons\%%~nxF"
     ) else (
-        copy "%%~fF" "%TARGET%\Mods\PantheonAddons\%%~nxF" >nul
+        call :copy_file "%%~fF" "%TARGET%\Mods\PantheonAddons\%%~nxF"
         if errorlevel 1 goto :fail
-        echo   Added %%~nxF
     )
 )
 
 echo.
 echo Install complete.
+call :print_report
 echo Start Pantheon PTR and check MelonLoader logs if a mod does not appear.
 goto :cleanup_success
+
+:copy_file
+set "SRC_FILE=%~1"
+set "DEST_FILE=%~2"
+if exist "%DEST_FILE%" (
+    set "ACTION=Replaced"
+    set /A REPLACED_COUNT+=1
+    set "REPORT_Replaced_!REPLACED_COUNT!=%DEST_FILE%"
+) else (
+    set "ACTION=Added"
+    set /A ADDED_COUNT+=1
+    set "REPORT_Added_!ADDED_COUNT!=%DEST_FILE%"
+)
+copy /Y "%SRC_FILE%" "%DEST_FILE%" >nul
+if errorlevel 1 exit /b 1
+echo   %ACTION% %~nx2
+exit /b 0
+
+:record_preserved
+set /A PRESERVED_COUNT+=1
+set "REPORT_Preserved_!PRESERVED_COUNT!=%~1"
+echo   Keeping existing %~nx1
+exit /b 0
+
+:print_report
+echo.
+echo Install report:
+echo   Replaced files: %REPLACED_COUNT%
+for /L %%I in (1,1,%REPLACED_COUNT%) do echo     !REPORT_Replaced_%%I!
+echo   Added files: %ADDED_COUNT%
+for /L %%I in (1,1,%ADDED_COUNT%) do echo     !REPORT_Added_%%I!
+echo   Preserved existing configs: %PRESERVED_COUNT%
+for /L %%I in (1,1,%PRESERVED_COUNT%) do echo     !REPORT_Preserved_%%I!
+echo.
+exit /b 0
+
+:wait_to_close
+echo.
+pause
+exit /b %~1
+
+:fail_no_work
+call :wait_to_close 1
 
 :fail
 echo.
 echo Install failed. If Pantheon is running, close it and try again.
 if exist "%WORK%" rmdir /S /Q "%WORK%" >nul 2>nul
-exit /b 1
+call :wait_to_close 1
 
 :cleanup_success
 if exist "%WORK%" rmdir /S /Q "%WORK%" >nul 2>nul
-exit /b 0
+call :wait_to_close 0
