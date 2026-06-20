@@ -30,6 +30,10 @@ The boxed/receiver client reads the request file, finds the named in-game macro,
 
 By default, Macro Relay writes requests under:
 
-`%PUBLIC%\PantheonMacroRelay`
+`%PROGRAMDATA%\PantheonMacroRelay`
 
-For Sandboxie, two-computer setups, or custom sharing, edit `MacroRelayConfig.json` and set `RelayFolder` to a folder both clients can read and write.
+The game-local config lives at:
+
+`GameFolder\Mods\PantheonAddons\MacroRelayConfig.json`
+
+For Sandboxie, two-computer setups, or custom sharing, edit `MacroRelayConfig.json` and set `RelayFolder` to a folder both clients can read and write. You can also set `RequestPath` directly to the shared `macro-request.json` file. `/macrorelay path` shows the active config, relay folder, and request file.

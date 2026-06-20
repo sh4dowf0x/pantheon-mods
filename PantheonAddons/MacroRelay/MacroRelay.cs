@@ -26,6 +26,7 @@ public sealed class MacroRelay : Addon
     private readonly string _gameFolder = ResolveGameFolder();
     private string _relayFolder = DefaultRelayFolder;
     private string _requestPath = Path.Combine(DefaultRelayFolder, "macro-request.json");
+    private string _pathConfigStatus = "Using default Macro Relay paths.";
     private IAddonWindow? _hotbarWindow;
     private IAddonWindow? _slotEditorWindow;
     private IAddonTextComponent? _slotEditorTitle;
@@ -133,10 +134,10 @@ public sealed class MacroRelay : Addon
                 break;
             case "status":
                 Chat.AddInfoMessage($"{_lastStatus} Receiver: {(_receiverEnabled ? "on" : "off")}. Target sync: {(_targetSyncEnabled ? "on" : "off")}.");
+                ReportPathConfiguration();
                 break;
             case "path":
-                Chat.AddInfoMessage($"Macro Relay request file: {_requestPath}");
-                Chat.AddInfoMessage($"Macro Relay config: {LocalPathConfigPath}");
+                ReportPathConfiguration();
                 break;
             default:
                 Chat.AddInfoMessage("Macro Relay: unknown command. Try /macrorelay help.");
@@ -576,41 +577,41 @@ public sealed class MacroRelay : Addon
             return;
         }
 
-        const float buttonWidth = 108;
-        const float buttonHeight = 42;
-        const float gap = 8;
+        const float buttonWidth = 94;
+        const float buttonHeight = 34;
+        const float gap = 5;
         const int rowsPerColumn = 12;
         var visibleCount = Math.Clamp(_visibleSlotCount, 1, Math.Max(1, _slots.Length));
         _visibleSlotCount = visibleCount;
         var columns = (int)Math.Ceiling(visibleCount / (double)rowsPerColumn);
         var rows = Math.Min(rowsPerColumn, visibleCount);
-        var hotbarWidth = 25 + (columns * buttonWidth) + ((columns - 1) * gap);
-        var hotbarHeight = 85 + (rows * (buttonHeight + gap));
+        var hotbarWidth = 22 + (columns * buttonWidth) + ((columns - 1) * gap);
+        var hotbarHeight = 68 + (rows * (buttonHeight + gap));
         _hotbarWindow.SetWidth(hotbarWidth);
         _hotbarWindow.SetHeight(hotbarHeight);
 
-        var topY = (hotbarHeight / 2.0f) - 38.0f;
+        var topY = (hotbarHeight / 2.0f) - 31.0f;
         _receiverToggleButton = _hotbarWindow.AddButtonComponent("", ToggleReceiver);
-        _receiverToggleButton.SetSize(38, 24);
-        _receiverToggleButton.SetFontSize(11);
-        _receiverToggleButton.SetPosition(-48, topY);
+        _receiverToggleButton.SetSize(34, 22);
+        _receiverToggleButton.SetFontSize(10);
+        _receiverToggleButton.SetPosition(-42, topY);
         _hotbarButtons.Add(_receiverToggleButton);
         RefreshReceiverButton(true);
 
         var removeButton = _hotbarWindow.AddButtonComponent("-", RemoveHotbarSlot);
-        removeButton.SetSize(38, 24);
-        removeButton.SetFontSize(16);
+        removeButton.SetSize(34, 22);
+        removeButton.SetFontSize(15);
         removeButton.SetPosition(0, topY);
         _hotbarButtons.Add(removeButton);
 
         var addButton = _hotbarWindow.AddButtonComponent("+", AddHotbarSlot);
-        addButton.SetSize(38, 24);
-        addButton.SetFontSize(16);
-        addButton.SetPosition(48, topY);
+        addButton.SetSize(34, 22);
+        addButton.SetFontSize(15);
+        addButton.SetPosition(42, topY);
         _hotbarButtons.Add(addButton);
 
         var startX = -((columns - 1) * (buttonWidth + gap)) / 2.0f;
-        var startY = topY - 39.0f;
+        var startY = topY - 32.0f;
 
         for (var i = 0; i < visibleCount; i++)
         {
@@ -620,7 +621,7 @@ public sealed class MacroRelay : Addon
             var row = i % rowsPerColumn;
             var button = _hotbarWindow.AddButtonComponent(GetSlotButtonText(slot), () => ActivateSlot(slotIndex, true), () => OpenSlotEditor(slotIndex));
             button.SetSize(buttonWidth, buttonHeight);
-            button.SetFontSize(12);
+            button.SetFontSize(10.5f);
             button.SetPosition(startX + (column * (buttonWidth + gap)), startY - (row * (buttonHeight + gap)));
             _hotbarButtons.Add(button);
         }
@@ -856,8 +857,7 @@ public sealed class MacroRelay : Addon
             return;
         }
 
-        var slotNumber = _slots.Length + 1;
-        _slots = _slots.Append(new HotbarSlot($"Slot {slotNumber}", "", $"Ctrl+F{Math.Min(slotNumber, 12)}", GetDefaultKeyCode(slotNumber), true, false, false)).ToArray();
+        _slots = _slots.Append(CreateDefaultSlot(_slots.Length + 1)).ToArray();
         _visibleSlotCount = _slots.Length;
         SavePathConfig();
         RebuildHotbar();
@@ -984,27 +984,44 @@ public sealed class MacroRelay : Addon
 
     private void LoadPathConfig()
     {
+        _relayFolder = DefaultRelayFolder;
+        _requestPath = Path.Combine(_relayFolder, "macro-request.json");
+        _pathConfigStatus = "Using default Macro Relay paths.";
+
         var configPath = LocalPathConfigPath;
         if (!File.Exists(configPath))
         {
+            TryWriteDefaultPathConfig(configPath);
             return;
         }
 
         try
         {
             var config = JsonSerializer.Deserialize<PathConfig>(File.ReadAllText(configPath), ConfigJsonOptions);
-            var configuredRequestPath = ExpandConfiguredPath(config?.RequestPath);
-            var configuredRelayFolder = ExpandConfiguredPath(config?.RelayFolder);
+            var configuredRequestPath = ExpandConfiguredPath(FirstNonBlank(config?.RequestPath, config?.RelayPath, config?.RequestFile));
+            var configuredRelayFolder = ExpandConfiguredPath(
+                FirstNonBlank(
+                    config?.RelayFolder,
+                    config?.DataFolder,
+                    config?.SharedFolder,
+                    config?.Directory,
+                    config?.Folder));
 
             if (!string.IsNullOrWhiteSpace(configuredRequestPath))
             {
                 _requestPath = configuredRequestPath;
                 _relayFolder = Path.GetDirectoryName(_requestPath) ?? DefaultRelayFolder;
+                _pathConfigStatus = $"Loaded RequestPath from {configPath}.";
             }
             else if (!string.IsNullOrWhiteSpace(configuredRelayFolder))
             {
                 _relayFolder = configuredRelayFolder;
                 _requestPath = Path.Combine(_relayFolder, "macro-request.json");
+                _pathConfigStatus = $"Loaded RelayFolder from {configPath}.";
+            }
+            else
+            {
+                _pathConfigStatus = $"Config at {configPath} did not set RelayFolder or RequestPath; using defaults.";
             }
 
             _slots = BuildSlots(config?.Slots);
@@ -1014,7 +1031,38 @@ public sealed class MacroRelay : Addon
         }
         catch (Exception ex)
         {
+            _pathConfigStatus = $"Could not read config at {configPath}; using defaults.";
             Logger.Error($"Macro Relay path config failed: {ex}");
+        }
+    }
+
+    private void ReportPathConfiguration()
+    {
+        Chat.AddInfoMessage($"Macro Relay config: {LocalPathConfigPath}");
+        Chat.AddInfoMessage($"Macro Relay config status: {_pathConfigStatus}");
+        Chat.AddInfoMessage($"Macro Relay folder: {_relayFolder}");
+        Chat.AddInfoMessage($"Macro Relay request file: {_requestPath}");
+    }
+
+    private void TryWriteDefaultPathConfig(string configPath)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(configPath) ?? _gameFolder);
+            var config = new PathConfig(
+                RelayFolder: DefaultRelayFolder,
+                RequestPath: null,
+                Slots: CreateDefaultSlots().Select(slot => new HotbarSlotConfig(slot.Label, slot.Macro, slot.Shortcut, slot.KeyCode, slot.Ctrl, slot.Alt, slot.Shift)).ToArray(),
+                VisibleSlots: _visibleSlotCount,
+                ReceiverEnabled: _receiverEnabled,
+                TargetSyncEnabled: _targetSyncEnabled);
+            File.WriteAllText(configPath, JsonSerializer.Serialize(config, JsonOptions));
+            _pathConfigStatus = $"Created default config at {configPath}.";
+        }
+        catch (Exception ex)
+        {
+            _pathConfigStatus = $"Config missing at {configPath}; using defaults.";
+            Logger.Error($"Macro Relay default config creation failed: {ex}");
         }
     }
 
@@ -1027,6 +1075,11 @@ public sealed class MacroRelay : Addon
 
         var expanded = Environment.ExpandEnvironmentVariables(path.Trim());
         return Path.IsPathRooted(expanded) ? expanded : Path.GetFullPath(Path.Combine(_gameFolder, expanded));
+    }
+
+    private static string? FirstNonBlank(params string?[] values)
+    {
+        return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
     }
 
     private static string ResolveGameFolder()
@@ -1058,12 +1111,12 @@ public sealed class MacroRelay : Addon
             return defaultSlots;
         }
 
-        var count = Math.Clamp(configuredSlots.Length, 1, defaultSlots.Length);
+        var count = Math.Max(1, configuredSlots.Length);
         var slots = new HotbarSlot[count];
         for (var i = 0; i < count; i++)
         {
             var configured = configuredSlots[i];
-            var fallback = defaultSlots[i];
+            var fallback = i < defaultSlots.Length ? defaultSlots[i] : CreateDefaultSlot(i + 1);
             var parsed = ParseShortcut(configured.Shortcut);
             var keyCode = configured.KeyCode > 0 ? configured.KeyCode : parsed.KeyCode > 0 ? parsed.KeyCode : fallback.KeyCode;
             var ctrl = configured.Ctrl ?? parsed.Ctrl ?? fallback.Ctrl;
@@ -1115,10 +1168,24 @@ public sealed class MacroRelay : Addon
         };
     }
 
+    private static HotbarSlot CreateDefaultSlot(int slotNumber)
+    {
+        var keyCode = GetDefaultKeyCode(slotNumber);
+        return new HotbarSlot($"Slot {slotNumber}", "", $"Ctrl+{GetKeyName(keyCode)}", keyCode, true, false, false);
+    }
+
     private static string GetSlotButtonText(HotbarSlot slot)
     {
         var label = string.IsNullOrWhiteSpace(slot.Label) ? "Macro" : slot.Label;
-        return $"{label}{Environment.NewLine}{slot.Shortcut}";
+        return $"{label}{Environment.NewLine}{CompactShortcut(slot.Shortcut)}";
+    }
+
+    private static string CompactShortcut(string shortcut)
+    {
+        return shortcut
+            .Replace("Ctrl", "C", StringComparison.OrdinalIgnoreCase)
+            .Replace("Alt", "A", StringComparison.OrdinalIgnoreCase)
+            .Replace("Shift", "S", StringComparison.OrdinalIgnoreCase);
     }
 
     private bool IsSlotHotkeyPressed(HotbarSlot slot)
@@ -1321,7 +1388,19 @@ public sealed class MacroRelay : Addon
 
     private string LocalPathConfigPath => Path.Combine(_gameFolder, "Mods", "PantheonAddons", "MacroRelayConfig.json");
 
-    private sealed record PathConfig(string? RelayFolder, string? RequestPath, HotbarSlotConfig[]? Slots, int? VisibleSlots = null, bool? ReceiverEnabled = null, bool? TargetSyncEnabled = null);
+    private sealed record PathConfig(
+        string? RelayFolder,
+        string? RequestPath,
+        HotbarSlotConfig[]? Slots,
+        int? VisibleSlots = null,
+        bool? ReceiverEnabled = null,
+        bool? TargetSyncEnabled = null,
+        string? RelayPath = null,
+        string? RequestFile = null,
+        string? DataFolder = null,
+        string? SharedFolder = null,
+        string? Directory = null,
+        string? Folder = null);
 
     private sealed record HotbarSlotConfig(string? Label, string? Macro, string? Shortcut, int KeyCode = 0, bool? Ctrl = null, bool? Alt = null, bool? Shift = null);
 

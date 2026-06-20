@@ -1,5 +1,6 @@
 {
   "RelayFolder": "%PROGRAMDATA%\\PantheonMacroRelay",
+  "RequestPath": null,
   "VisibleSlots": 6,
   "ReceiverEnabled": false,
   "TargetSyncEnabled": true,

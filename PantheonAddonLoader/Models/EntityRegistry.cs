@@ -86,7 +86,7 @@ internal static class EntityRegistry
         var maxHealth = GetPoolValue(entity, PoolType.Health, false);
         var healthPercent = maxHealth > 0 ? currentHealth / maxHealth * 100f : 0f;
         var distance = GetDistanceFromLocal(position);
-        var isLocal = EntityPlayerGameObject.LocalPlayerId.Value == networkId;
+        var isLocal = IsLocalPlayer(entity, networkId);
 
         return new EntitySnapshot(
             TimestampUtc: DateTime.UtcNow,
@@ -122,6 +122,26 @@ internal static class EntityRegistry
         {
             networkId = entity.NetworkId.Value;
             return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool IsLocalPlayer(BaseEntityGameObject entity, uint networkId)
+    {
+        if (networkId != 0 && EntityPlayerGameObject.LocalPlayerId.Value == networkId)
+        {
+            return true;
+        }
+
+        try
+        {
+            var localPlayer = EntityPlayerGameObject.LocalPlayer;
+            return localPlayer != null
+                && localPlayer.Pointer != IntPtr.Zero
+                && localPlayer.Pointer == entity.Pointer;
         }
         catch
         {

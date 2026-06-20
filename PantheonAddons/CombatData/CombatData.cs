@@ -318,16 +318,16 @@ public sealed class CombatData : Addon
             return;
         }
 
-        var damage = Regex.Match(combatText, @"^(?<source>.+?) dealt (?<amount>\d+) (?<damageType>\w+) damage to (?<target>.+?) with (?<ability>.+?)\. \((?<mitigated>\d+) mitigated\)(?<flags>.*)$");
+        var damage = Regex.Match(combatText, @"^(?<source>.+?) dealt (?<amount>\d[\d,]*) (?<damageType>\w+) damage to (?<target>.+?) with (?<ability>.+?)\. \((?<mitigated>\d[\d,]*) mitigated\)(?<flags>.*)$");
         if (damage.Success)
         {
             payload["eventType"] = "damage";
             payload["source"] = damage.Groups["source"].Value;
             payload["target"] = damage.Groups["target"].Value;
-            payload["amount"] = int.Parse(damage.Groups["amount"].Value);
+            payload["amount"] = ParseCombatInteger(damage.Groups["amount"].Value);
             payload["damageType"] = damage.Groups["damageType"].Value;
             payload["ability"] = damage.Groups["ability"].Value;
-            payload["mitigated"] = int.Parse(damage.Groups["mitigated"].Value);
+            payload["mitigated"] = ParseCombatInteger(damage.Groups["mitigated"].Value);
             AddFlags(payload, damage.Groups["flags"].Value);
             return;
         }
@@ -354,25 +354,30 @@ public sealed class CombatData : Addon
             return;
         }
 
-        var sourceHealing = Regex.Match(combatText, @"^(?<source>.+?)'s (?<ability>.+?) healed (?<target>.+?) for (?<amount>\d+)\.$");
+        var sourceHealing = Regex.Match(combatText, @"^(?<source>.+?)'s (?<ability>.+?) healed (?<target>.+?) for (?<amount>\d[\d,]*)\.$");
         if (sourceHealing.Success)
         {
             payload["eventType"] = "healing";
             payload["source"] = sourceHealing.Groups["source"].Value;
             payload["target"] = sourceHealing.Groups["target"].Value;
             payload["ability"] = sourceHealing.Groups["ability"].Value;
-            payload["amount"] = int.Parse(sourceHealing.Groups["amount"].Value);
+            payload["amount"] = ParseCombatInteger(sourceHealing.Groups["amount"].Value);
             return;
         }
 
-        var passiveHealing = Regex.Match(combatText, @"^(?<target>.+?) was healed for (?<amount>\d+) by (?<ability>.+?)\.$");
+        var passiveHealing = Regex.Match(combatText, @"^(?<target>.+?) was healed for (?<amount>\d[\d,]*) by (?<ability>.+?)\.$");
         if (passiveHealing.Success)
         {
             payload["eventType"] = "healing";
             payload["target"] = passiveHealing.Groups["target"].Value;
             payload["ability"] = passiveHealing.Groups["ability"].Value;
-            payload["amount"] = int.Parse(passiveHealing.Groups["amount"].Value);
+            payload["amount"] = ParseCombatInteger(passiveHealing.Groups["amount"].Value);
         }
+    }
+
+    private static int ParseCombatInteger(string value)
+    {
+        return int.Parse(value.Replace(",", ""));
     }
 
     private static string ExtractCombatText(Dictionary<string, object?> payload, string message)

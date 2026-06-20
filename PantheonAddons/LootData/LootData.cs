@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using UnityEngine;
 
 namespace PantheonAddons.LootData;
 
@@ -23,12 +24,20 @@ public sealed class LootData : Addon
     private bool _includeInventoryEvents = true;
     private bool _includeLootChat = true;
     private bool _includeRawDump;
+    private bool _exportIcons = true;
+    private bool _iconProbe;
+    private string _iconOutputFolder = Path.Combine(DefaultOutputFolder, "icons");
+    private string _iconManifestPath = Path.Combine(DefaultOutputFolder, "loot-icons-current.jsonl");
     private int _maxFileMegabytes = 5;
     private int _inventoryEventCount;
     private int _lootChatCount;
+    private int _iconExportCount;
+    private int _iconExportFailureCount;
     private readonly Queue<IInventoryItem> _pendingSnapshotItems = new();
     private readonly Dictionary<long, AcquisitionSource> _recentEntitiesByCharacterId = new();
     private readonly Queue<LootChatClue> _recentLootChatClues = new();
+    private readonly HashSet<string> _observedIconKeys = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _exportAttemptedIconKeys = new(StringComparer.OrdinalIgnoreCase);
     private int _pendingSnapshotTotal;
     private int _pendingSnapshotWritten;
     private bool _snapshotInProgress;
@@ -71,6 +80,8 @@ public sealed class LootData : Addon
             new BoolConfigurationValue("Inventory events", "Writes item added and removed events.", _includeInventoryEvents, value => _includeInventoryEvents = value),
             new BoolConfigurationValue("Loot chat", "Writes loot-like chat messages.", _includeLootChat, value => _includeLootChat = value),
             new BoolConfigurationValue("Raw dump", "Writes the full raw item/template object graph. Use only for small tests.", _includeRawDump, value => _includeRawDump = value),
+            new BoolConfigurationValue("Export icons", "Writes one PNG per unique item icon key when the icon sprite can be resolved.", _exportIcons, value => _exportIcons = value),
+            new BoolConfigurationValue("Icon probe", "Logs sprite lookup details for icon export troubleshooting.", _iconProbe, value => _iconProbe = value),
             new IntConfigurationValue("Max file MB", "Rotates the live JSONL file when it reaches this size.", _maxFileMegabytes, 1, 100, 1, value => _maxFileMegabytes = value)
         };
     }
@@ -95,17 +106,19 @@ public sealed class LootData : Addon
     {
         if (args.Length == 0 || args[0].Equals("help", StringComparison.OrdinalIgnoreCase))
         {
-            Chat.AddInfoMessage("Loot Data: /lootdata status, path, clear, reopen, inventory on|off, chat on|off, raw on|off, snapshot");
+            Chat.AddInfoMessage("Loot Data: /lootdata status, path, clear, reopen, inventory on|off, chat on|off, raw on|off, icons on|off, iconprobe on|off, snapshot");
             return;
         }
 
         switch (args[0].ToLowerInvariant())
         {
             case "status":
-                Chat.AddInfoMessage($"{_lastStatus} enabled={_isEnabled}; inventoryEvents={_inventoryEventCount}; lootChat={_lootChatCount}; cap={_maxFileMegabytes}MB");
+                Chat.AddInfoMessage($"{_lastStatus} enabled={_isEnabled}; inventoryEvents={_inventoryEventCount}; lootChat={_lootChatCount}; icons={_iconExportCount}; iconFailures={_iconExportFailureCount}; cap={_maxFileMegabytes}MB");
                 break;
             case "path":
                 Chat.AddInfoMessage($"Loot Data events: {_eventsPath}");
+                Chat.AddInfoMessage($"Loot Data icons: {_iconOutputFolder}");
+                Chat.AddInfoMessage($"Loot Data icon manifest: {_iconManifestPath}");
                 Chat.AddInfoMessage($"Loot Data config: {LocalPathConfigPath}");
                 break;
             case "clear":
@@ -124,6 +137,12 @@ public sealed class LootData : Addon
                 break;
             case "raw":
                 HandleToggle(args, "Raw dump", value => _includeRawDump = value, _includeRawDump);
+                break;
+            case "icons":
+                HandleToggle(args, "Icon export", value => _exportIcons = value, _exportIcons);
+                break;
+            case "iconprobe":
+                HandleToggle(args, "Icon probe", value => _iconProbe = value, _iconProbe);
                 break;
             case "snapshot":
                 WriteInventorySnapshot();
@@ -261,6 +280,7 @@ public sealed class LootData : Addon
         var itemId = SafeRead(() => item.Id);
         var itemName = SafeRead(() => item.Name);
         var resolvedItemName = string.IsNullOrWhiteSpace(itemName) ? snapshot?.Name : itemName;
+        var iconPayload = BuildIconPayload(snapshot, resolvedItemName);
         WriteEvent(new Dictionary<string, object?>
         {
             ["timestamp"] = DateTime.Now.ToString("O"),
@@ -270,8 +290,198 @@ public sealed class LootData : Addon
             ["itemInstanceId"] = itemId == Guid.Empty ? snapshot?.InstanceId : itemId,
             ["itemName"] = resolvedItemName,
             ["acquisition"] = ResolveAcquisition(eventType, snapshot, resolvedItemName),
+            ["icon"] = iconPayload,
             ["item"] = snapshot
         });
+    }
+
+    private Dictionary<string, object?>? BuildIconPayload(ItemSnapshot? snapshot, string? itemName)
+    {
+        var iconKey = GetTemplateField(snapshot, "iconKey");
+        if (string.IsNullOrWhiteSpace(iconKey))
+        {
+            return null;
+        }
+
+        var iconFileName = $"{SanitizeFileName(iconKey)}.png";
+        var iconPath = Path.Combine(_iconOutputFolder, iconFileName);
+        var iconFileReference = BuildIconFileReference(iconPath);
+        var payload = new Dictionary<string, object?>
+        {
+            ["iconKey"] = iconKey,
+            ["iconFile"] = iconFileReference
+        };
+
+        if (!_exportIcons)
+        {
+            payload["exportStatus"] = "disabled";
+            return payload;
+        }
+
+        var result = TryExportIcon(iconKey, iconPath);
+        payload["exportStatus"] = result.Status;
+        payload["exportMessage"] = result.Message;
+        payload["spriteName"] = result.SpriteName;
+        payload["textureName"] = result.TextureName;
+        payload["width"] = result.Width;
+        payload["height"] = result.Height;
+        WriteIconManifest(iconKey, iconFileReference, result, snapshot, itemName);
+        return payload;
+    }
+
+    private IconExportResult TryExportIcon(string iconKey, string iconPath)
+    {
+        if (File.Exists(iconPath))
+        {
+            return new IconExportResult("exists", null, null, null, null, null);
+        }
+
+        if (!_exportAttemptedIconKeys.Add(iconKey))
+        {
+            return new IconExportResult("pending_or_failed", "Icon export was already attempted this session.", null, null, null, null);
+        }
+
+        try
+        {
+            Directory.CreateDirectory(_iconOutputFolder);
+            var sprite = FindIconSprite(iconKey);
+            if (sprite == null)
+            {
+                _iconExportFailureCount++;
+                LogIconProbe(iconKey, "No loaded sprite matched the icon key.");
+                return new IconExportResult("unresolved", "No loaded sprite matched the icon key.", null, null, null, null);
+            }
+
+            var png = EncodeSpriteToPng(sprite);
+            File.WriteAllBytes(iconPath, png);
+            _iconExportCount++;
+            return new IconExportResult("exported", null, sprite.name, sprite.texture?.name, Math.Round(sprite.rect.width), Math.Round(sprite.rect.height));
+        }
+        catch (Exception ex)
+        {
+            _iconExportFailureCount++;
+            LogIconProbe(iconKey, $"{ex.GetType().Name}: {ex.Message}");
+            return new IconExportResult("failed", $"{ex.GetType().Name}: {ex.Message}", null, null, null, null);
+        }
+    }
+
+    private Sprite? FindIconSprite(string iconKey)
+    {
+        var normalizedIconKey = NormalizeIconKey(iconKey);
+
+        foreach (var sprite in Resources.FindObjectsOfTypeAll<Sprite>())
+        {
+            if (sprite == null || string.IsNullOrWhiteSpace(sprite.name))
+            {
+                continue;
+            }
+
+            var normalizedSpriteName = NormalizeIconKey(sprite.name);
+            if (normalizedSpriteName.Equals(normalizedIconKey, StringComparison.OrdinalIgnoreCase))
+            {
+                return sprite;
+            }
+        }
+
+        return null;
+    }
+
+    private static byte[] EncodeSpriteToPng(Sprite sprite)
+    {
+        var texture = sprite.texture ?? throw new InvalidOperationException("Sprite has no texture.");
+        var rect = ResolveSpriteTextureRect(sprite);
+        var width = Math.Max(1, (int)Math.Round(rect.width));
+        var height = Math.Max(1, (int)Math.Round(rect.height));
+
+        try
+        {
+            var cropped = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            cropped.SetPixels(texture.GetPixels((int)Math.Round(rect.x), (int)Math.Round(rect.y), width, height));
+            cropped.Apply();
+            return ImageConversion.EncodeToPNG(cropped).ToArray();
+        }
+        catch
+        {
+            return EncodeSpriteToPngViaRenderTexture(texture, rect, width, height);
+        }
+    }
+
+    private static Rect ResolveSpriteTextureRect(Sprite sprite)
+    {
+        try
+        {
+            return sprite.textureRect;
+        }
+        catch
+        {
+            return sprite.rect;
+        }
+    }
+
+    private static byte[] EncodeSpriteToPngViaRenderTexture(Texture2D texture, Rect rect, int width, int height)
+    {
+        var previousActive = RenderTexture.active;
+        var atlasCopy = RenderTexture.GetTemporary(texture.width, texture.height, 0, RenderTextureFormat.ARGB32);
+
+        try
+        {
+            Graphics.Blit(texture, atlasCopy);
+            RenderTexture.active = atlasCopy;
+
+            var cropped = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            cropped.ReadPixels(new Rect((int)Math.Round(rect.x), (int)Math.Round(rect.y), width, height), 0, 0);
+            cropped.Apply();
+            return ImageConversion.EncodeToPNG(cropped).ToArray();
+        }
+        finally
+        {
+            RenderTexture.active = previousActive;
+            RenderTexture.ReleaseTemporary(atlasCopy);
+        }
+    }
+
+    private void WriteIconManifest(string iconKey, string iconFileReference, IconExportResult result, ItemSnapshot? snapshot, string? itemName)
+    {
+        if (!_observedIconKeys.Add(iconKey) && !result.Status.Equals("exported", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var payload = new Dictionary<string, object?>
+        {
+            ["timestamp"] = DateTime.Now.ToString("O"),
+            ["eventType"] = "icon_observed",
+            ["iconKey"] = iconKey,
+            ["iconFile"] = iconFileReference,
+            ["exportStatus"] = result.Status,
+            ["exportMessage"] = result.Message,
+            ["itemId"] = snapshot?.ItemId,
+            ["itemName"] = itemName ?? snapshot?.Name,
+            ["templateItemId"] = GetTemplateField(snapshot, "itemId"),
+            ["templateItemKey"] = GetTemplateField(snapshot, "itemKey"),
+            ["spriteName"] = result.SpriteName,
+            ["textureName"] = result.TextureName,
+            ["width"] = result.Width,
+            ["height"] = result.Height
+        };
+
+        try
+        {
+            Directory.CreateDirectory(_outputFolder);
+            File.AppendAllText(_iconManifestPath, JsonSerializer.Serialize(payload) + Environment.NewLine, Encoding.UTF8);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Loot Data icon manifest write failed: {ex}");
+        }
+    }
+
+    private void LogIconProbe(string iconKey, string message)
+    {
+        if (_iconProbe)
+        {
+            Logger.Info($"Loot Data icon probe '{iconKey}': {message}");
+        }
     }
 
     private void TrackEntity(EntitySnapshot entity)
@@ -722,7 +932,15 @@ public sealed class LootData : Addon
             _includeInventoryEvents = config?.IncludeInventoryEvents ?? _includeInventoryEvents;
             _includeLootChat = config?.IncludeLootChat ?? _includeLootChat;
             _includeRawDump = config?.IncludeRawDump ?? _includeRawDump;
+            _exportIcons = config?.ExportIcons ?? _exportIcons;
+            _iconProbe = config?.IconProbe ?? _iconProbe;
             _maxFileMegabytes = Math.Clamp(config?.MaxFileMegabytes ?? _maxFileMegabytes, 1, 100);
+
+            var configuredIconFolder = ExpandConfiguredPath(config?.IconOutputFolder);
+            _iconOutputFolder = string.IsNullOrWhiteSpace(configuredIconFolder)
+                ? Path.Combine(_outputFolder, "icons")
+                : configuredIconFolder;
+            _iconManifestPath = Path.Combine(_outputFolder, "loot-icons-current.jsonl");
         }
         catch (Exception ex)
         {
@@ -737,7 +955,10 @@ public sealed class LootData : Addon
             IncludeInventoryEvents: _includeInventoryEvents,
             IncludeLootChat: _includeLootChat,
             IncludeRawDump: _includeRawDump,
-            MaxFileMegabytes: _maxFileMegabytes);
+            ExportIcons: _exportIcons,
+            IconProbe: _iconProbe,
+            MaxFileMegabytes: _maxFileMegabytes,
+            IconOutputFolder: _iconOutputFolder);
 
         Directory.CreateDirectory(Path.GetDirectoryName(LocalPathConfigPath) ?? _gameFolder);
         File.WriteAllText(LocalPathConfigPath, JsonSerializer.Serialize(config, JsonOptions));
@@ -757,6 +978,52 @@ public sealed class LootData : Addon
     private static string? FirstNonBlank(params string?[] values)
     {
         return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+    }
+
+    private static string? GetTemplateField(ItemSnapshot? snapshot, string key)
+    {
+        if (snapshot?.Template == null)
+        {
+            return null;
+        }
+
+        return snapshot.Template.TryGetValue(key, out var value) ? value : null;
+    }
+
+    private static string SanitizeFileName(string value)
+    {
+        var sanitized = Regex.Replace(value.Trim(), @"[^A-Za-z0-9._-]+", "_").Trim('_', '.', '-');
+        if (string.IsNullOrWhiteSpace(sanitized))
+        {
+            sanitized = "icon";
+        }
+
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).Substring(0, 8).ToLowerInvariant();
+        return $"{sanitized}_{hash}";
+    }
+
+    private static string NormalizeIconKey(string value)
+    {
+        return Regex.Replace(value.Trim(), @"[^A-Za-z0-9]+", "", RegexOptions.CultureInvariant);
+    }
+
+    private string BuildIconFileReference(string iconPath)
+    {
+        try
+        {
+            var outputRoot = Path.GetFullPath(_outputFolder).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            var fullIconPath = Path.GetFullPath(iconPath);
+            if (fullIconPath.StartsWith(outputRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                return Path.GetRelativePath(_outputFolder, fullIconPath);
+            }
+
+            return fullIconPath;
+        }
+        catch
+        {
+            return iconPath;
+        }
     }
 
     private static string ResolveGameFolder()
@@ -789,10 +1056,21 @@ public sealed class LootData : Addon
         bool? IncludeInventoryEvents = null,
         bool? IncludeLootChat = null,
         bool? IncludeRawDump = null,
+        bool? ExportIcons = null,
+        bool? IconProbe = null,
         int? MaxFileMegabytes = null,
+        string? IconOutputFolder = null,
         string? DataFolder = null,
         string? Directory = null,
         string? Folder = null);
+
+    private sealed record IconExportResult(
+        string Status,
+        string? Message,
+        string? SpriteName,
+        string? TextureName,
+        double? Width,
+        double? Height);
 
     private sealed record AcquisitionSource(
         string Name,
